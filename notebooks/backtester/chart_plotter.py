@@ -1,8 +1,7 @@
 # chart_plotter.py
-
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-import pandas as pd
 
 class ChartPlotter:
     def __init__(self, trades_df, shared_data, indicators=None):
@@ -34,7 +33,6 @@ class ChartPlotter:
 
             # Create the main price chart
             ax1 = plt.subplot(gs[0])
-            price_data['time'] = pd.to_datetime(price_data['time'])
             ax1.plot(price_data['time'], price_data['close'], label=f'{symbol} Close Price', color='#1f77b4', linewidth=1.5)
 
             # Optional: Plot indicators on the second chart
