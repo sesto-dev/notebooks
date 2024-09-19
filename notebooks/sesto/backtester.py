@@ -11,10 +11,16 @@ class Trade:
     entry_time: datetime
     entry_price: float
     position_type: str
-    volume: float
+    position_size_usd: float
     tp: float
     sl: float
     used_capital: float
+    potential_profit_usd: float = field(init=False)
+    potential_profit_percent: float = field(init=False)
+    potential_loss_usd: float = field(init=False)
+    potential_loss_percent: float = field(init=False)
+    tp_price_diff_percent: float = field(init=False)
+    sl_price_diff_percent: float = field(init=False)
     close_time: datetime = None
     close_price: float = None
     pnl: float = None
@@ -23,6 +29,25 @@ class Trade:
     closing_reason: str = None
     unrealized_pnl: float = 0
 
+    def __post_init__(self):
+        self.calculate_potential_outcomes()
+
+    def calculate_potential_outcomes(self):
+        if self.position_type == 'long':
+            self.potential_profit_usd = (self.tp - self.entry_price) * self.position_size_usd
+            self.potential_loss_usd = (self.entry_price - self.sl) * self.position_size_usd
+            self.tp_price_diff_percent = (self.tp - self.entry_price) / self.entry_price * 100
+            self.sl_price_diff_percent = (self.entry_price - self.sl) / self.entry_price * 100
+        else:  # short position
+            self.potential_profit_usd = (self.entry_price - self.tp) * self.position_size_usd
+            self.potential_loss_usd = (self.sl - self.entry_price) * self.position_size_usd
+            self.tp_price_diff_percent = (self.entry_price - self.tp) / self.entry_price * 100
+            self.sl_price_diff_percent = (self.sl - self.entry_price) / self.entry_price * 100
+
+        # Calculate percentages based on used capital
+        self.potential_profit_percent = (self.potential_profit_usd / self.used_capital) * 100
+        self.potential_loss_percent = (self.potential_loss_usd / self.used_capital) * 100
+
 class Backtester:
     def __init__(
         self, 
@@ -30,7 +55,7 @@ class Backtester:
         initial_capital: float, 
         transaction_cost: float = 0.0001, 
         slippage: float = 0.0001,
-        leverage: float = 500.0  # Added leverage parameter
+        leverage: float = 500.0
     ):
         self.data = data
         self.initial_capital = initial_capital
@@ -53,44 +78,53 @@ class Backtester:
     def check_entry(self, symbol: str, time: datetime, row: pd.Series):
         trade_info = self.entry_condition(symbol, time, row, self.open_trades, self.closed_trades)
         if trade_info:
-            required_capital = self.calculate_required_capital(trade_info['entry_price'], trade_info['volume'], symbol)
+            capital_allocation = trade_info['capital_allocation']
+            position_size_usd = self.calculate_position_size(capital_allocation, trade_info['entry_price'], symbol)
+            required_capital = self.calculate_required_capital(trade_info['entry_price'], position_size_usd, symbol)
+            
             if required_capital <= self.available_capital:
-                self.open_trade(symbol, time, required_capital, **trade_info)
+                self.open_trade(symbol, time, required_capital, position_size_usd, trade_info)
             else:
                 print(f"Not enough capital to open trade for {symbol} at {time}")
 
-    def calculate_required_capital(self, entry_price: float, volume: float, symbol: str) -> float:
-        notional_value = entry_price * volume
-        margin_required = notional_value / self.leverage  # Adjust for leverage
-        transaction_cost = notional_value * self.transaction_cost
-        slippage_cost = notional_value * self.slippage
-        return margin_required + transaction_cost + slippage_cost  # Use margin as used capital
+    def calculate_position_size(self, capital_allocation: float, entry_price: float, symbol: str) -> float:
+        # Calculate position size in units of the base currency
+        return capital_allocation * self.leverage / entry_price
 
-    def open_trade(self, symbol: str, entry_time: datetime, required_capital: float, entry_price: float, position_type: str, volume: float, tp: float, sl: float):
+    def calculate_required_capital(self, entry_price: float, position_size_usd: float, symbol: str) -> float:
+        margin_required = position_size_usd / self.leverage
+        transaction_cost = position_size_usd * self.transaction_cost
+        slippage_cost = position_size_usd * self.slippage
+        return margin_required + transaction_cost + slippage_cost
+
+    def open_trade(self, symbol: str, entry_time: datetime, required_capital: float, position_size_usd: float, trade_info: dict):
         trade = Trade(
             symbol=symbol,
             entry_time=entry_time,
-            entry_price=entry_price,
-            position_type=position_type,
-            volume=volume,
-            tp=tp,
-            sl=sl,
+            entry_price=trade_info['entry_price'],
+            position_type=trade_info['position_type'],
+            position_size_usd=position_size_usd,
+            tp=trade_info['tp'],
+            sl=trade_info['sl'],
             used_capital=required_capital
         )
         self.open_trades.append(trade)
         self.available_capital -= required_capital
-        print(f"Opened {position_type} trade for {symbol} at {entry_price}. Available capital: {self.available_capital:.2f}")
+        print(f"Opened {trade_info['position_type']} trade for {symbol} at {trade_info['entry_price']}. Available capital: {self.available_capital:.2f}")
+        print(f"Potential profit: ${trade.potential_profit_usd:.2f} ({trade.potential_profit_percent:.2f}%)")
+        print(f"Potential loss: ${trade.potential_loss_usd:.2f} ({trade.potential_loss_percent:.2f}%)")
+        print(f"TP price diff: {trade.tp_price_diff_percent:.2f}%, SL price diff: {trade.sl_price_diff_percent:.2f}%")
 
     def update_open_trades(self, symbol: str, time: datetime, row: pd.Series):
         for trade in self.open_trades[:]:  # Create a copy of the list to iterate over
             if trade.symbol == symbol:
                 self.update_trade_metrics(trade, row)
                 
-                # Update unrealized_pnl with leverage
+                # Update unrealized_pnl
                 if trade.position_type == 'long':
-                    trade.unrealized_pnl = (row['close'] - trade.entry_price) * trade.volume * self.leverage
+                    trade.unrealized_pnl = (row['close'] - trade.entry_price) / trade.entry_price * trade.position_size_usd
                 else:  # short position
-                    trade.unrealized_pnl = (trade.entry_price - row['close']) * trade.volume * self.leverage
+                    trade.unrealized_pnl = (trade.entry_price - row['close']) / trade.entry_price * trade.position_size_usd
                 
                 if self.exit_condition(trade, time, row, self.open_trades, self.closed_trades):
                     self.close_trade(trade, time, row['close'], 'exit_condition')
@@ -113,11 +147,11 @@ class Backtester:
         trade.closing_reason = reason
         
         if trade.position_type == 'long':
-            trade.pnl = (close_price - trade.entry_price) * trade.volume * self.leverage
+            trade.pnl = (close_price - trade.entry_price) / trade.entry_price * trade.position_size_usd
         else:  # short position
-            trade.pnl = (trade.entry_price - close_price) * trade.volume * self.leverage
+            trade.pnl = (trade.entry_price - close_price) / trade.entry_price * trade.position_size_usd
         
-        trade.pnl -= (close_price * trade.volume * self.transaction_cost) + (close_price * trade.volume * self.slippage)  # Account for closing costs
+        trade.pnl -= (trade.position_size_usd * self.transaction_cost) + (trade.position_size_usd * self.slippage)  # Account for closing costs
         
         trade.unrealized_pnl = 0
         self.open_trades.remove(trade)
@@ -125,7 +159,7 @@ class Backtester:
         self.available_capital += trade.used_capital + trade.pnl
         self.trade_log.append(trade)
 
-        print(f"Closed {trade.position_type} trade for {trade.symbol} at {close_price} with PNL {trade.pnl:.4f}. Available capital: {self.available_capital:.2f}")
+        print(f"Closed {trade.position_type} trade for {trade.symbol} at {close_price} with PNL {trade.pnl:.2f}. Available capital: {self.available_capital:.2f}")
 
     def close_all_trades(self, last_timestamp: datetime):
         for trade in self.open_trades[:]:  # Create a copy of the list to iterate over
