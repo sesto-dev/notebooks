@@ -11,7 +11,7 @@ def performance(trades_df, initial_capital):
     best_trade = trades_df['pnl'].max()
     worst_trade = trades_df['pnl'].min()
     avg_trade = trades_df['pnl'].mean()
-    trade_durations = (trades_df['exit_time'] - trades_df['entry_time'])
+    trade_durations = (trades_df['close_time'] - trades_df['entry_time'])
     max_trade_duration = trade_durations.max()
     avg_trade_duration = trade_durations.mean()
     profit_factor = trades_df.loc[trades_df['pnl'] > 0, 'pnl'].sum() / -trades_df.loc[trades_df['pnl'] < 0, 'pnl'].sum()
