@@ -8,6 +8,10 @@ def SMA(df, period):
     df[f'sma-{period}'] = df['close'].rolling(period).mean()
     df.dropna(subset=[f'sma-{period}'], inplace=True)
 
+def EMA(df, period):
+    df[f'ema-{period}'] = df['close'].ewm(span=period, adjust=False).mean()
+    df.dropna(subset=[f'ema-{period}'], inplace=True)
+
 def BB(df, period, std):
     rolling_mean = df['close'].rolling(period).mean()
     rolling_std = df['close'].rolling(period).std()
@@ -39,3 +43,11 @@ def RSI(df: pd.DataFrame, period: int):
     # Clean up intermediate columns
     df.drop(columns=['price_diff', 'gain', 'loss', 'avg_gain', 'avg_loss', 'rs'], inplace=True)
     df.dropna(subset=[f'rsi-{period}'], inplace=True)
+
+def ROC(df, period):
+    df[f'roc-{period}'] = (df['close'] - df['close'].shift(period)) / df['close'].shift(period) * 100
+    df.dropna(subset=[f'roc-{period}'], inplace=True)
+
+def ROCR(df, period):
+    df[f'rocr-{period}'] = df['close'] / df['close'].shift(period)
+    df.dropna(subset=[f'rocr-{period}'], inplace=True)
