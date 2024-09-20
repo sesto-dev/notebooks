@@ -169,6 +169,23 @@ class Backtester:
         trades_df = pd.DataFrame([trade.__dict__ for trade in self.closed_trades])
         return performance(trades_df, self.initial_capital)
     
+    def generate_report_per_symbol(self):
+        symbol_reports = {}
+        for symbol in self.data.keys():
+            symbol_trades = [trade for trade in self.closed_trades if trade.symbol == symbol]
+            if symbol_trades:
+                trades_df = pd.DataFrame([trade.__dict__ for trade in symbol_trades])
+                report = performance(trades_df, self.initial_capital)
+                
+                # Insert a row at the top with the symbol
+                symbol_row = pd.DataFrame({'Metric': ['Symbol'], 'Value': [symbol]})
+                report = pd.concat([symbol_row, report]).reset_index(drop=True)
+                
+                symbol_reports[symbol] = report
+            else:
+                print(f"No closed trades for symbol: {symbol}")
+        return symbol_reports
+    
     def entry_condition(self, symbol: str, time: datetime, row: pd.Series, open_trades: List[Trade], closed_trades: List[Trade]) -> Optional[Dict]:
         # This method should be overridden in the subclass
         return None

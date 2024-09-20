@@ -39,8 +39,19 @@ def performance(trades_df, initial_capital):
     downside_returns = daily_returns[daily_returns < 0]
     sortino_ratio = excess_return / (downside_returns.std() * np.sqrt(trading_days)) if len(downside_returns) > 0 else 0
     
-    max_drawdown_pct = max_drawdown / initial_capital
-    calmar_ratio = annualized_return / abs(max_drawdown_pct) if max_drawdown_pct != 0 else 0
+    # Calculate drawdown
+    cumulative_returns = (1 + trades_df['pnl'].cumsum() / initial_capital)
+    peak = cumulative_returns.cummax()
+    drawdown = (cumulative_returns - peak) / peak
+    max_drawdown = drawdown.min()
+    avg_drawdown = drawdown.mean()
+
+    # Convert drawdown to dollar value
+    max_drawdown_dollar = max_drawdown * initial_capital
+    avg_drawdown_dollar = avg_drawdown * initial_capital
+
+    # Calculate Calmar ratio
+    calmar_ratio = abs(annualized_return / max_drawdown) if max_drawdown != 0 else 0
 
     # Additional metrics
     avg_profit = trades_df.loc[trades_df['pnl'] > 0, 'pnl'].mean()
@@ -73,8 +84,8 @@ def performance(trades_df, initial_capital):
                    'Trades per Year', 'Trades Left Open', 'Trades Closed by TP', 'Trades Closed by SL', 
                    'Trades Closed by Exit Condition'],
         'Value': [initial_capital, final_capital, total_profit, (final_capital / initial_capital - 1) * 100, annualized_return * 100,
-                  annualized_volatility * 100, sharpe_ratio, sortino_ratio, calmar_ratio, max_drawdown,
-                  max_drawdown_pct * 100, avg_drawdown, num_trades, win_rate * 100, best_trade, 
+                  annualized_volatility * 100, sharpe_ratio, sortino_ratio, calmar_ratio, max_drawdown_dollar,
+                  max_drawdown * 100, avg_drawdown_dollar, num_trades, win_rate * 100, best_trade, 
                   worst_trade, avg_trade, avg_risk_reward_ratio, max_trade_duration, avg_trade_duration, 
                   total_fees, first_trade_time, last_trade_time, avg_time_between_trades, trades_per_day, 
                   trades_per_week, trades_per_month, trades_per_year, trades_left_open, trades_closed_by_tp, 

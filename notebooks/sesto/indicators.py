@@ -48,6 +48,20 @@ def ROC(df, period):
     df[f'roc-{period}'] = (df['close'] - df['close'].shift(period)) / df['close'].shift(period) * 100
     df.dropna(subset=[f'roc-{period}'], inplace=True)
 
-def ROCR(df, period):
-    df[f'rocr-{period}'] = df['close'] / df['close'].shift(period)
-    df.dropna(subset=[f'rocr-{period}'], inplace=True)
+def MACD(df: pd.DataFrame, column: str = 'close', short_period: int = 12, long_period: int = 26, signal_period: int = 9) -> pd.DataFrame:
+    ema_short = df[column].ewm(span=short_period, adjust=False).mean()
+    ema_long = df[column].ewm(span=long_period, adjust=False).mean()
+    df['macd'] = ema_short - ema_long
+    df['macd-signal'] = df['macd'].ewm(span=signal_period, adjust=False).mean()
+    df['macd-histogram'] = df['macd'] - df['macd-signal']
+    df.dropna(subset=['macd'], inplace=True)
+    df.dropna(subset=['macd-signal'], inplace=True)
+    df.dropna(subset=['macd-histogram'], inplace=True)
+
+def ATR(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
+    high_low = df['high'] - df['low']
+    high_close = (df['high'] - df['close'].shift(1)).abs()
+    low_close = (df['low'] - df['close'].shift(1)).abs()
+    ranges = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+    df['atr'] = ranges.rolling(window=period).mean()
+   
