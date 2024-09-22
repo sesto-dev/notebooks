@@ -36,14 +36,14 @@ class Trade:
         self.calculate_potential_outcomes()
 
     def calculate_potential_outcomes(self):
-        if self.position_type == 'long':
-            self.potential_profit_usd = (self.tp - self.entry_price) * self.position_size_usd
-            self.potential_loss_usd = (self.entry_price - self.sl) * self.position_size_usd
+        if self.position_type == 'long':            
+            self.potential_profit_usd = (self.tp - self.entry_price ) / self.entry_price * self.position_size_usd
+            self.potential_loss_usd = (self.entry_price - self.sl) / self.entry_price * self.position_size_usd
             self.tp_price_diff_percent = (self.tp - self.entry_price) / self.entry_price * 100
             self.sl_price_diff_percent = (self.entry_price - self.sl) / self.entry_price * 100
-        else:  # short position
-            self.potential_profit_usd = (self.entry_price - self.tp) * self.position_size_usd
-            self.potential_loss_usd = (self.sl - self.entry_price) * self.position_size_usd
+        else:  # short position            
+            self.potential_profit_usd = (self.entry_price - self.tp) / self.entry_price * self.position_size_usd
+            self.potential_loss_usd = (self.sl - self.entry_price) / self.entry_price * self.position_size_usd
             self.tp_price_diff_percent = (self.entry_price - self.tp) / self.entry_price * 100
             self.sl_price_diff_percent = (self.sl - self.entry_price) / self.entry_price * 100
 
@@ -90,11 +90,11 @@ class Backtester:
 
     def calculate_position_size(self, capital_allocation: float, entry_price: float, symbol: str) -> float:
         # This is a simple position size calculation. You might want to adjust this based on your specific needs.
-        return capital_allocation / entry_price
+        return capital_allocation * self.leverage
 
     def calculate_required_capital(self, entry_price: float, position_size_usd: float, symbol: str) -> float:
         # This calculates the required capital based on the leverage
-        return (position_size_usd * entry_price) / self.leverage
+        return position_size_usd/ self.leverage
 
     def open_trade(self, symbol: str, time: datetime, required_capital: float, position_size_usd: float, trade_info: Dict):
         trade = Trade(
@@ -150,13 +150,14 @@ class Backtester:
 
     def close_trade(self, trade: Trade, close_time: datetime, close_price: float, reason: str):
         trade.close_time = close_time
-        trade.close_price = close_price
         trade.closing_reason = reason
         
         if trade.position_type == 'long':
-            trade.pnl = (close_price - trade.entry_price) / trade.entry_price * trade.position_size_usd
+            trade.close_price = close_price * (1 - self.slippage)
+            trade.pnl = (trade.close_price - trade.entry_price) / trade.entry_price * trade.position_size_usd
         else:  # short position
-            trade.pnl = (trade.entry_price - close_price) / trade.entry_price * trade.position_size_usd
+            trade.close_price = close_price * (1 + self.slippage)
+            trade.pnl = (trade.entry_price - trade.close_price) / trade.entry_price * trade.position_size_usd
         
         trade.pnl -= (trade.position_size_usd * self.transaction_cost) + (trade.position_size_usd * self.slippage)  # Account for closing costs
         
@@ -174,8 +175,8 @@ class Backtester:
 
     def generate_report(self):
         trades_df = pd.DataFrame([trade.__dict__ for trade in self.closed_trades])
-        # timeframes that ac
         other_timeframes = [tf for tf in self.data.keys() if tf != self.main_timeframe]
+
         return performance(trades_df, self.initial_capital, self.main_timeframe, other_timeframes, self.backtest_duration)    
 
     def generate_report_per_symbol(self):

@@ -2,15 +2,12 @@ import pandas as pd
 
 def STD(df, period):
     df[f'std-{period}'] = df['close'].rolling(period).std()
-    df.dropna(subset=[f'std-{period}'], inplace=True)
 
 def SMA(df, period):
     df[f'sma-{period}'] = df['close'].rolling(period).mean()
-    df.dropna(subset=[f'sma-{period}'], inplace=True)
 
 def EMA(df, period):
     df[f'ema-{period}'] = df['close'].ewm(span=period, adjust=False).mean()
-    df.dropna(subset=[f'ema-{period}'], inplace=True)
 
 def BB(df, period, std):
     rolling_mean = df['close'].rolling(period).mean()
@@ -19,8 +16,6 @@ def BB(df, period, std):
     df[f'bbm-{period}-{std}'] = rolling_mean
     df[f'bbu-{period}-{std}'] = rolling_mean + (rolling_std * std)
     df[f'bbl-{period}-{std}'] = rolling_mean - (rolling_std * std)
-
-    df.dropna(subset=[f'bbm-{period}-{std}'], inplace=True)
 
 def RSI(df: pd.DataFrame, period: int):   
     # Step 1: Calculate the price differences
@@ -42,11 +37,9 @@ def RSI(df: pd.DataFrame, period: int):
     
     # Clean up intermediate columns
     df.drop(columns=['price_diff', 'gain', 'loss', 'avg_gain', 'avg_loss', 'rs'], inplace=True)
-    df.dropna(subset=[f'rsi-{period}'], inplace=True)
 
 def ROC(df, period):
     df[f'roc-{period}'] = (df['close'] - df['close'].shift(period)) / df['close'].shift(period) * 100
-    df.dropna(subset=[f'roc-{period}'], inplace=True)
 
 def MACD(df: pd.DataFrame, column: str = 'close', short_period: int = 12, long_period: int = 26, signal_period: int = 9) -> pd.DataFrame:
     ema_short = df[column].ewm(span=short_period, adjust=False).mean()
@@ -54,9 +47,6 @@ def MACD(df: pd.DataFrame, column: str = 'close', short_period: int = 12, long_p
     df['macd'] = ema_short - ema_long
     df['macd-signal'] = df['macd'].ewm(span=signal_period, adjust=False).mean()
     df['macd-histogram'] = df['macd'] - df['macd-signal']
-    df.dropna(subset=['macd'], inplace=True)
-    df.dropna(subset=['macd-signal'], inplace=True)
-    df.dropna(subset=['macd-histogram'], inplace=True)
 
 def ATR(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
     high_low = df['high'] - df['low']
