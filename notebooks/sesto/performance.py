@@ -69,21 +69,21 @@ def performance(trades_df, initial_capital, main_timeframe, backtest_duration):
     trades_per_month = trades_per_day * 30
     trades_per_year = trades_per_day * 365
     trades_left_open = (trades_df['closing_reason'] == 'end_of_backtest').sum()
-    trades_closed_by_tp = (trades_df['closing_reason'] == 'tp').sum()
-    trades_closed_by_sl = (trades_df['closing_reason'] == 'sl').sum()
+    trades_closed_by_tp = (trades_df['closing_reason'] == 'tp_p').sum()
+    trades_closed_by_sl = (trades_df['closing_reason'] == 'sl_p').sum()
     trades_closed_by_exit_condition = (trades_df['closing_reason'] == 'exit_condition').sum()
 
     # New metrics
-    num_long_trades = (trades_df['position_type'] == 'long').sum()
-    num_short_trades = (trades_df['position_type'] == 'short').sum()
+    num_long_trades = (trades_df['type'] == 'long').sum()
+    num_short_trades = (trades_df['type'] == 'short').sum()
     percent_long_trades = (num_long_trades / num_trades) * 100 if num_trades > 0 else 0
     percent_short_trades = (num_short_trades / num_trades) * 100 if num_trades > 0 else 0
     
-    win_rate_long = (trades_df[trades_df['position_type'] == 'long']['pnl'] > 0).mean() * 100
-    win_rate_short = (trades_df[trades_df['position_type'] == 'short']['pnl'] > 0).mean() * 100
+    win_rate_long = (trades_df[trades_df['type'] == 'long']['pnl'] > 0).mean() * 100
+    win_rate_short = (trades_df[trades_df['type'] == 'short']['pnl'] > 0).mean() * 100
     
-    pnl_long = trades_df[trades_df['position_type'] == 'long']['pnl'].sum()
-    pnl_short = trades_df[trades_df['position_type'] == 'short']['pnl'].sum()
+    pnl_long = trades_df[trades_df['type'] == 'long']['pnl'].sum()
+    pnl_short = trades_df[trades_df['type'] == 'short']['pnl'].sum()
 
     # Summary Table with Proper Formatting
     performance_summary = pd.DataFrame({
@@ -93,7 +93,7 @@ def performance(trades_df, initial_capital, main_timeframe, backtest_duration):
                    'Worst Trade ($)', 'Avg. Trade ($)', 'Avg. Risk/Reward Ratio', 'Max. Trade Duration', 
                    'Avg. Trade Duration', 'Total Fees ($)', 'First Trade Time', 'Last Trade Time', 
                    'Avg. Time Between Trades', 'Trades per Day', 'Trades per Week', 'Trades per Month', 
-                   'Trades per Year', 'Trades Left Open', 'Trades Closed by TP', 'Trades Closed by SL', 
+                   'Trades per Year', 'Trades Left Open', 'Trades Closed by tp_p', 'Trades Closed by sl_p', 
                     'Trades Closed by Exit Condition', 'Main Timeframe', 'Backtest Duration',
                     'Number of Long Trades', 'Number of Short Trades', 'Percentage of Long Trades', 'Percentage of Short Trades',
                     'Win Rate of Long Trades', 'Win Rate of Short Trades',

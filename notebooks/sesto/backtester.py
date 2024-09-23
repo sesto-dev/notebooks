@@ -12,11 +12,11 @@ from datetime import timedelta
 class Trade:
     symbol: str
     entry_time: datetime
-    entry_price: float
+    entry_p: float
     type: str
     position_size_usd: float
-    tp: float
-    sl: float
+    tp_p: float
+    sl_p: float
     used_capital: float
     potential_profit_usd: float = field(init=False)
     potential_profit_percent: float = field(init=False)
@@ -32,35 +32,60 @@ class Trade:
     closing_reason: str = None
     unrealized_pnl: float = 0
     leverage: float = 500.0
-    liquidation_price: float = None
+    liq_p: float = None
+    be_p: float = None
+    order_cost: float = None
+    spread_multiplier: float = 0.0001
+    cost_multiplier: float = 0.0001
 
     def __post_init__(self):
+        self.calculate_prices_with_spread()
+        self.calculate_cost()
+        self.calculate_be()
         self.calculate_potential_outcomes()
-        self.calculate_liquidation_price()
+        self.calculate_liq()
+
+    def calculate_prices_with_spread(self):
+        if self.type == 'long':
+            self.entry_p = self.entry_p * (1 + self.spread_multiplier)
+            self.tp_p = self.tp_p * (1 - self.spread_multiplier)    
+            self.sl_p = self.sl_p * (1 + self.spread_multiplier)
+        else:
+            self.entry_p = self.entry_p * (1 - self.spread_multiplier)
+            self.tp_p = self.tp_p * (1 + self.spread_multiplier)
+            self.sl_p = self.sl_p * (1 - self.spread_multiplier)
+
+    def calculate_cost(self):
+        self.order_cost = (self.position_size_usd / 1000000) * 16 * 2
+
+    # Calculate the break even price, accounting for the order cost and spread
+    def calculate_be(self):
+        self.be_p = self.entry_p * (1 + (self.order_cost / self.position_size_usd))
 
     def calculate_potential_outcomes(self):
         if self.type == 'long':            
-            self.potential_profit_usd = (self.tp - self.entry_price ) / self.entry_price * self.position_size_usd
-            self.potential_loss_usd = (self.entry_price - self.sl) / self.entry_price * self.position_size_usd
-            self.tp_price_diff_percent = (self.tp - self.entry_price) / self.entry_price * 100
-            self.sl_price_diff_percent = (self.entry_price - self.sl) / self.entry_price * 100
+            self.potential_profit_usd = ((self.tp_p - self.entry_p ) / self.entry_p * self.position_size_usd) - self.order_cost
+            self.potential_loss_usd = ((self.entry_p - self.sl_p) / self.entry_p * self.position_size_usd) - self.order_cost
+            self.tp_price_diff_percent = (self.potential_profit_usd / self.used_capital) * 100
+            self.sl_price_diff_percent = (self.potential_loss_usd / self.used_capital) * 100
         else:  # short position            
-            self.potential_profit_usd = (self.entry_price - self.tp) / self.entry_price * self.position_size_usd
-            self.potential_loss_usd = (self.sl - self.entry_price) / self.entry_price * self.position_size_usd
-            self.tp_price_diff_percent = (self.entry_price - self.tp) / self.entry_price * 100
-            self.sl_price_diff_percent = (self.sl - self.entry_price) / self.entry_price * 100
+            self.potential_profit_usd = ((self.entry_p - self.tp_p) / self.entry_p * self.position_size_usd) - self.order_cost
+            self.potential_loss_usd = ((self.sl_p - self.entry_p) / self.entry_p * self.position_size_usd) - self.order_cost
+            self.tp_price_diff_percent = (self.potential_profit_usd / self.used_capital) * 100
+            self.sl_price_diff_percent = (self.potential_loss_usd / self.used_capital) * 100
 
         # Calculate percentages based on used capital
         self.potential_profit_percent = (self.potential_profit_usd / self.used_capital) * 100
         self.potential_loss_percent = (self.potential_loss_usd / self.used_capital) * 100
     
-    def calculate_liquidation_price(self):
+    def calculate_liq(self):
         if self.type == 'long':
-            self.liquidation_price = self.entry_price * (1 - (1 / self.leverage))
+            self.liq_p = self.entry_p * (1 - (1 / self.leverage))
         elif self.type == 'short':
-            self.liquidation_price = self.entry_price * (1 + (1 / self.leverage))
+            self.liq_p = self.entry_p * (1 + (1 / self.leverage))
         else:
             raise ValueError(f"Unknown position type: {self.type}")
+
 
 class Backtester:
     def __init__(
@@ -68,8 +93,8 @@ class Backtester:
         data: Dict[MT5Timeframe, Dict[str, pd.DataFrame]], 
         initial_capital: float, 
         main_timeframe: MT5Timeframe,
-        transaction_cost: float = 0.0001, 
-        slippage: float = 0.0001,
+        cost_multiplier: float = 0.0001,
+        spread_multiplier: float = 0.0001,
         leverage: float = 500.0
     ):
         self.data = data
@@ -79,56 +104,59 @@ class Backtester:
         self.open_trades: List[Trade] = []
         self.closed_trades: List[Trade] = []
         self.trade_log = []
-        self.transaction_cost = transaction_cost
-        self.slippage = slippage
+        self.cost_multiplier = cost_multiplier
+        self.spread_multiplier = spread_multiplier
         self.leverage = leverage
         self.backtest_duration = None
 
     def run(self):
         start_time = time.time()
+
         if self.main_timeframe not in self.data:
             raise ValueError(f"Main timeframe {self.main_timeframe} not found in data")
 
-        
         for symbol, df in self.data[self.main_timeframe].items():
             for _, row in df.iterrows():
                 self.update_open_trades(symbol, row['time'], row, self.main_timeframe)
                 self.check_entry(symbol, row['time'], row, self.main_timeframe)
         
         self.close_all_trades(list(self.data[self.main_timeframe].values())[-1]['time'].iloc[-1])
+        
         end_time = time.time()
         self.backtest_duration = timedelta(seconds=end_time - start_time)
 
-    def calculate_position_size(self, capital_allocation: float, entry_price: float, symbol: str) -> float:
+    def calculate_position_size(self, capital_allocation: float, entry_p: float, symbol: str) -> float:
         # This is a simple position size calculation. You might want to adjust this based on your specific needs.
         return capital_allocation * self.leverage
 
-    def calculate_required_capital(self, entry_price: float, position_size_usd: float, symbol: str) -> float:
+    def calculate_required_capital(self, entry_p: float, position_size_usd: float, symbol: str) -> float:
         # This calculates the required capital based on the leverage
-        return position_size_usd/ self.leverage
+        return position_size_usd / self.leverage
 
     def open_trade(self, symbol: str, time: datetime, required_capital: float, position_size_usd: float, trade_info: Dict):
         trade = Trade(
             symbol=symbol,
             entry_time=time,
-            entry_price=trade_info['entry_price'],
+            entry_p=trade_info['entry_p'],
             type=trade_info['type'],
             position_size_usd=position_size_usd,
-            tp=trade_info['tp'],
-            sl=trade_info['sl'],
+            tp_p=trade_info['tp_p'],
+            sl_p=trade_info['sl_p'],
             used_capital=required_capital,
-            leverage=self.leverage
+            leverage=self.leverage,
+            spread_multiplier=self.spread_multiplier,
+            cost_multiplier=self.cost_multiplier
         )
         self.open_trades.append(trade)
-        self.available_capital -= required_capital
-        print(f"{time} - OPENED TRADE - {trade.type} - {symbol} - ENTRY: ${trade.entry_price:.3f} - TP: ${trade.tp:.3f} - SL: ${trade.sl:.3f} - LIQ: ${trade.liquidation_price:.3f}")
+        self.available_capital -= required_capital + trade.order_cost
+        print(f"{time} - {symbol} - OPENED TRADE - {trade.type} - ENTRY: ${trade.entry_p:.3f} - TP: ${trade.tp_p:.3f} - SL: ${trade.sl_p:.3f} - LIQ: ${trade.liq_p:.3f} - BE: ${trade.be_p:.3f} - AVAILABLE CAPITAL: ${self.available_capital}")
 
     def check_entry(self, symbol: str, time: datetime, row: pd.Series, timeframe: MT5Timeframe):
         trade_info = self.entry_condition(symbol, time, row, self.open_trades, self.closed_trades, timeframe)
         if trade_info:
             capital_allocation = trade_info['capital_allocation']
-            position_size_usd = self.calculate_position_size(capital_allocation, trade_info['entry_price'], symbol)
-            required_capital = self.calculate_required_capital(trade_info['entry_price'], position_size_usd, symbol)
+            position_size_usd = self.calculate_position_size(capital_allocation, trade_info['entry_p'], symbol)
+            required_capital = self.calculate_required_capital(trade_info['entry_p'], position_size_usd, symbol)
             
             if required_capital <= self.available_capital:
                 self.open_trade(symbol, time, required_capital, position_size_usd, trade_info)
@@ -139,47 +167,50 @@ class Backtester:
         for trade in self.open_trades[:]:
             if trade.symbol == symbol:
                 self.update_trade_metrics(trade, row)
-                
-                if trade.type == 'long':
-                    trade.unrealized_pnl = (row['close'] - trade.entry_price) / trade.entry_price * trade.position_size_usd
-                else:  # short position
-                    trade.unrealized_pnl = (trade.entry_price - row['close']) / trade.entry_price * trade.position_size_usd
+
+                long_trade_should_close_at_tp = trade.type == 'long' and (row['close'] >= trade.tp_p)
+                short_trade_should_close_at_tp = trade.type == 'short' and (row['close'] <= trade.tp_p)
+                long_trade_should_close_at_sl = trade.type == 'long' and (row['close'] <= trade.sl_p)
+                short_trade_should_close_at_sl = trade.type == 'short' and (row['close'] >= trade.sl_p)
                 
                 if self.exit_condition(trade, time, row, self.open_trades, self.closed_trades, timeframe):
                     self.close_trade(trade, time, row['close'], 'exit_condition')
-                elif (trade.type == 'long' and row['close'] >= trade.tp) or (trade.type == 'short' and row['close'] <= trade.tp):
-                    self.close_trade(trade, time, trade.tp, 'tp')
-                elif (trade.type == 'long' and row['close'] <= trade.sl) or (trade.type == 'short' and row['close'] >= trade.sl):
-                    self.close_trade(trade, time, trade.sl, 'sl')
+                elif long_trade_should_close_at_tp or short_trade_should_close_at_tp:
+                    self.close_trade(trade, time, trade.tp_p, 'TP')
+                elif long_trade_should_close_at_sl or short_trade_should_close_at_sl:
+                    self.close_trade(trade, time, trade.sl_p, 'SL')
                 else:
                     self.trailing_stop(trade, time, row, self.open_trades, self.closed_trades, timeframe)
 
     def update_trade_metrics(self, trade: Trade, row: pd.Series):
+        if trade.type == 'long':
+            trade.unrealized_pnl = ((row['close'] - trade.entry_p) / trade.entry_p * trade.position_size_usd) - trade.order_cost
+        else:  # short position
+            trade.unrealized_pnl = ((trade.entry_p - row['close']) / trade.entry_p * trade.position_size_usd) - trade.order_cost
+
         # Update max_drawdown and max_profit
         if trade.pnl is not None:
-            trade.max_profit = max(trade.max_profit, trade.pnl)
-            trade.max_drawdown = min(trade.max_drawdown, trade.pnl)
+            trade.max_profit = max(trade.max_profit, trade.unrealized_pnl)
+            trade.max_drawdown = min(trade.max_drawdown, trade.unrealized_pnl)
 
     def close_trade(self, trade: Trade, close_time: datetime, close_price: float, reason: str):
         trade.close_time = close_time
         trade.closing_reason = reason
         
         if trade.type == 'long':
-            trade.close_price = close_price * (1 - self.slippage)
-            trade.pnl = (trade.close_price - trade.entry_price) / trade.entry_price * trade.position_size_usd
+            trade.close_price = close_price * (1 - self.spread_multiplier)
+            trade.pnl = ((trade.close_price - trade.entry_p) / trade.entry_p * trade.position_size_usd) - trade.order_cost
         else:  # short position
-            trade.close_price = close_price * (1 + self.slippage)
-            trade.pnl = (trade.entry_price - trade.close_price) / trade.entry_price * trade.position_size_usd
-        
-        trade.pnl -= (trade.position_size_usd * self.transaction_cost) + (trade.position_size_usd * self.slippage)  # Account for closing costs
-        
+            trade.close_price = close_price * (1 + self.spread_multiplier)
+            trade.pnl = ((trade.entry_p - trade.close_price) / trade.entry_p * trade.position_size_usd) - trade.order_cost
+                
         trade.unrealized_pnl = 0
         self.open_trades.remove(trade)
         self.closed_trades.append(trade)
         self.available_capital += trade.used_capital + trade.pnl
         self.trade_log.append(trade)
 
-        print(f"{trade.close_time} - CLOSED TRADE - {trade.type} - {trade.symbol} - CLOSE: ${close_price} - PNL: ${trade.pnl:.2f} - SL: ${trade.sl:.3f} - TP: ${trade.tp:.3f} - REASON: {reason}")
+        print(f"{trade.close_time} - {trade.symbol} - CLOSED TRADE - {trade.type} - ENTRY: ${trade.entry_p:.3f} - CLOSE: ${close_price:.3f} - PNL: ${trade.pnl:.2f} - SL: ${trade.sl_p:.3f} - TP: ${trade.tp_p:.3f} - REASON: {reason} - AVAILABLE CAPITAL: ${self.available_capital}")
 
     def close_all_trades(self, last_timestamp: datetime):
         for trade in self.open_trades[:]:  # Create a copy of the list to iterate over
