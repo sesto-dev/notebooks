@@ -57,7 +57,7 @@ def performance(trades_df, initial_capital, main_timeframe, backtest_duration):
     avg_profit = trades_df.loc[trades_df['pnl'] > 0, 'pnl'].mean()
     avg_loss = trades_df.loc[trades_df['pnl'] < 0, 'pnl'].mean()
     avg_risk_reward_ratio = abs(avg_profit / avg_loss) if avg_loss != 0 else 0
-    total_fees = trades_df['position_size_usd'].sum() * 0.0002  # Assuming 0.02% total fees (transaction cost + slippage)
+    total_fees = trades_df['position_size_usd'].sum() * 0.0002  # Assuming 0.02% total fees (transaction fee + slippage)
 
     # New metrics
     first_trade_time = trades_df['entry_time'].min()
@@ -69,8 +69,9 @@ def performance(trades_df, initial_capital, main_timeframe, backtest_duration):
     trades_per_month = trades_per_day * 30
     trades_per_year = trades_per_day * 365
     trades_left_open = (trades_df['closing_reason'] == 'end_of_backtest').sum()
-    trades_closed_by_tp = (trades_df['closing_reason'] == 'tp_p').sum()
-    trades_closed_by_sl = (trades_df['closing_reason'] == 'sl_p').sum()
+    trades_closed_by_tp = (trades_df['closing_reason'] == 'TP').sum()
+    trades_closed_by_sl = (trades_df['closing_reason'] == 'SL').sum()
+    trades_closed_by_liq = (trades_df['closing_reason'] == 'LIQ').sum()
     trades_closed_by_exit_condition = (trades_df['closing_reason'] == 'exit_condition').sum()
 
     # New metrics
@@ -93,7 +94,7 @@ def performance(trades_df, initial_capital, main_timeframe, backtest_duration):
                    'Worst Trade ($)', 'Avg. Trade ($)', 'Avg. Risk/Reward Ratio', 'Max. Trade Duration', 
                    'Avg. Trade Duration', 'Total Fees ($)', 'First Trade Time', 'Last Trade Time', 
                    'Avg. Time Between Trades', 'Trades per Day', 'Trades per Week', 'Trades per Month', 
-                   'Trades per Year', 'Trades Left Open', 'Trades Closed by tp_p', 'Trades Closed by sl_p', 
+                   'Trades per Year', 'Trades Left Open', 'Trades closed by TP', 'Trades closed by SL', 'Trades closed by liquidation',
                     'Trades Closed by Exit Condition', 'Main Timeframe', 'Backtest Duration',
                     'Number of Long Trades', 'Number of Short Trades', 'Percentage of Long Trades', 'Percentage of Short Trades',
                     'Win Rate of Long Trades', 'Win Rate of Short Trades',
@@ -105,7 +106,7 @@ def performance(trades_df, initial_capital, main_timeframe, backtest_duration):
                   worst_trade, avg_trade, avg_risk_reward_ratio, max_trade_duration, avg_trade_duration, 
                   total_fees, first_trade_time, last_trade_time, avg_time_between_trades, trades_per_day, 
                   trades_per_week, trades_per_month, trades_per_year, trades_left_open, trades_closed_by_tp, 
-                  trades_closed_by_sl, trades_closed_by_exit_condition, main_timeframe.name, str(backtest_duration),
+                  trades_closed_by_sl, trades_closed_by_liq, trades_closed_by_exit_condition, main_timeframe.name, str(backtest_duration),
                 num_long_trades, num_short_trades, f'{percent_long_trades:.2f}%', f'{percent_short_trades:.2f}%', f'{win_rate_long:.2f}%', f'{win_rate_short:.2f}%', f'${pnl_long:.2f}', f'${pnl_short:.2f}',]
     })
 
