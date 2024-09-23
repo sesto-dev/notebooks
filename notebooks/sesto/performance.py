@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from datetime import timedelta
 
-def performance(trades_df, initial_capital, main_timeframe, other_timeframes, backtest_duration):
+def performance(trades_df, initial_capital, main_timeframe, backtest_duration):
     # Calculate Performance Metrics
     total_profit = trades_df['pnl'].sum()
     num_trades = len(trades_df)
@@ -94,7 +94,7 @@ def performance(trades_df, initial_capital, main_timeframe, other_timeframes, ba
                    'Avg. Trade Duration', 'Total Fees ($)', 'First Trade Time', 'Last Trade Time', 
                    'Avg. Time Between Trades', 'Trades per Day', 'Trades per Week', 'Trades per Month', 
                    'Trades per Year', 'Trades Left Open', 'Trades Closed by TP', 'Trades Closed by SL', 
-                    'Trades Closed by Exit Condition', 'Main Timeframe', 'Other Timeframes', 'Backtest Duration',
+                    'Trades Closed by Exit Condition', 'Main Timeframe', 'Backtest Duration',
                     'Number of Long Trades', 'Number of Short Trades', 'Percentage of Long Trades', 'Percentage of Short Trades',
                     'Win Rate of Long Trades', 'Win Rate of Short Trades',
                     'PnL of Long Trades', 'PnL of Short Trades',],
@@ -105,7 +105,7 @@ def performance(trades_df, initial_capital, main_timeframe, other_timeframes, ba
                   worst_trade, avg_trade, avg_risk_reward_ratio, max_trade_duration, avg_trade_duration, 
                   total_fees, first_trade_time, last_trade_time, avg_time_between_trades, trades_per_day, 
                   trades_per_week, trades_per_month, trades_per_year, trades_left_open, trades_closed_by_tp, 
-                  trades_closed_by_sl, trades_closed_by_exit_condition, main_timeframe.name, ', '.join([tf.name for tf in other_timeframes]), str(backtest_duration),
+                  trades_closed_by_sl, trades_closed_by_exit_condition, main_timeframe.name, str(backtest_duration),
                 num_long_trades, num_short_trades, f'{percent_long_trades:.2f}%', f'{percent_short_trades:.2f}%', f'{win_rate_long:.2f}%', f'{win_rate_short:.2f}%', f'${pnl_long:.2f}', f'${pnl_short:.2f}',]
     })
 

@@ -13,7 +13,7 @@ class Trade:
     symbol: str
     entry_time: datetime
     entry_price: float
-    position_type: str
+    type: str
     position_size_usd: float
     tp: float
     sl: float
@@ -31,12 +31,15 @@ class Trade:
     max_profit: float = 0
     closing_reason: str = None
     unrealized_pnl: float = 0
+    leverage: float = 500.0
+    liquidation_price: float = None
 
     def __post_init__(self):
         self.calculate_potential_outcomes()
+        self.calculate_liquidation_price()
 
     def calculate_potential_outcomes(self):
-        if self.position_type == 'long':            
+        if self.type == 'long':            
             self.potential_profit_usd = (self.tp - self.entry_price ) / self.entry_price * self.position_size_usd
             self.potential_loss_usd = (self.entry_price - self.sl) / self.entry_price * self.position_size_usd
             self.tp_price_diff_percent = (self.tp - self.entry_price) / self.entry_price * 100
@@ -50,6 +53,14 @@ class Trade:
         # Calculate percentages based on used capital
         self.potential_profit_percent = (self.potential_profit_usd / self.used_capital) * 100
         self.potential_loss_percent = (self.potential_loss_usd / self.used_capital) * 100
+    
+    def calculate_liquidation_price(self):
+        if self.type == 'long':
+            self.liquidation_price = self.entry_price * (1 - (1 / self.leverage))
+        elif self.type == 'short':
+            self.liquidation_price = self.entry_price * (1 + (1 / self.leverage))
+        else:
+            raise ValueError(f"Unknown position type: {self.type}")
 
 class Backtester:
     def __init__(
@@ -101,15 +112,16 @@ class Backtester:
             symbol=symbol,
             entry_time=time,
             entry_price=trade_info['entry_price'],
-            position_type=trade_info['position_type'],
+            type=trade_info['type'],
             position_size_usd=position_size_usd,
             tp=trade_info['tp'],
             sl=trade_info['sl'],
-            used_capital=required_capital
+            used_capital=required_capital,
+            leverage=self.leverage
         )
         self.open_trades.append(trade)
         self.available_capital -= required_capital
-        print(f"Opened {trade.position_type} trade for {symbol} at {trade.entry_price}. Available capital: {self.available_capital:.2f}")
+        print(f"{time} - OPENED TRADE - {trade.type} - {symbol} - ENTRY: ${trade.entry_price:.3f} - TP: ${trade.tp:.3f} - SL: ${trade.sl:.3f} - LIQ: ${trade.liquidation_price:.3f}")
 
     def check_entry(self, symbol: str, time: datetime, row: pd.Series, timeframe: MT5Timeframe):
         trade_info = self.entry_condition(symbol, time, row, self.open_trades, self.closed_trades, timeframe)
@@ -128,16 +140,16 @@ class Backtester:
             if trade.symbol == symbol:
                 self.update_trade_metrics(trade, row)
                 
-                if trade.position_type == 'long':
+                if trade.type == 'long':
                     trade.unrealized_pnl = (row['close'] - trade.entry_price) / trade.entry_price * trade.position_size_usd
                 else:  # short position
                     trade.unrealized_pnl = (trade.entry_price - row['close']) / trade.entry_price * trade.position_size_usd
                 
                 if self.exit_condition(trade, time, row, self.open_trades, self.closed_trades, timeframe):
                     self.close_trade(trade, time, row['close'], 'exit_condition')
-                elif (trade.position_type == 'long' and row['close'] >= trade.tp) or (trade.position_type == 'short' and row['close'] <= trade.tp):
+                elif (trade.type == 'long' and row['close'] >= trade.tp) or (trade.type == 'short' and row['close'] <= trade.tp):
                     self.close_trade(trade, time, trade.tp, 'tp')
-                elif (trade.position_type == 'long' and row['close'] <= trade.sl) or (trade.position_type == 'short' and row['close'] >= trade.sl):
+                elif (trade.type == 'long' and row['close'] <= trade.sl) or (trade.type == 'short' and row['close'] >= trade.sl):
                     self.close_trade(trade, time, trade.sl, 'sl')
                 else:
                     self.trailing_stop(trade, time, row, self.open_trades, self.closed_trades, timeframe)
@@ -152,7 +164,7 @@ class Backtester:
         trade.close_time = close_time
         trade.closing_reason = reason
         
-        if trade.position_type == 'long':
+        if trade.type == 'long':
             trade.close_price = close_price * (1 - self.slippage)
             trade.pnl = (trade.close_price - trade.entry_price) / trade.entry_price * trade.position_size_usd
         else:  # short position
@@ -167,7 +179,7 @@ class Backtester:
         self.available_capital += trade.used_capital + trade.pnl
         self.trade_log.append(trade)
 
-        print(f"Closed {trade.position_type} trade for {trade.symbol} at {close_price} with PNL {trade.pnl:.2f}. Available capital: {self.available_capital:.2f}")
+        print(f"{trade.close_time} - CLOSED TRADE - {trade.type} - {trade.symbol} - CLOSE: ${close_price} - PNL: ${trade.pnl:.2f} - SL: ${trade.sl:.3f} - TP: ${trade.tp:.3f} - REASON: {reason}")
 
     def close_all_trades(self, last_timestamp: datetime):
         for trade in self.open_trades[:]:  # Create a copy of the list to iterate over
@@ -175,9 +187,8 @@ class Backtester:
 
     def generate_report(self):
         trades_df = pd.DataFrame([trade.__dict__ for trade in self.closed_trades])
-        other_timeframes = [tf for tf in self.data.keys() if tf != self.main_timeframe]
 
-        return performance(trades_df, self.initial_capital, self.main_timeframe, other_timeframes, self.backtest_duration)    
+        return performance(trades_df, self.initial_capital, self.main_timeframe, self.backtest_duration)    
 
     def generate_report_per_symbol(self):
         symbol_reports = {}
