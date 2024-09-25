@@ -18,7 +18,7 @@ class Trade:
     position_size_usd: float
     tp_p: float
     sl_p: float
-    used_capital: float
+    capital: float
     potential_profit_usd: float = field(init=False)
     potential_profit_percent: float = field(init=False)
     potential_loss_usd: float = field(init=False)
@@ -59,17 +59,17 @@ class Trade:
         if self.type == 'long':            
             self.potential_profit_usd = ((self.tp_p - self.entry_p ) / self.entry_p * self.position_size_usd) - self.order_fee
             self.potential_loss_usd = ((self.entry_p - self.sl_p) / self.entry_p * self.position_size_usd) - self.order_fee
-            self.tp_price_diff_percent = (self.potential_profit_usd / self.used_capital) * 100
-            self.sl_price_diff_percent = (self.potential_loss_usd / self.used_capital) * 100
+            self.tp_price_diff_percent = (self.potential_profit_usd / self.capital) * 100
+            self.sl_price_diff_percent = (self.potential_loss_usd / self.capital) * 100
         else:  # short position            
             self.potential_profit_usd = ((self.entry_p - self.tp_p) / self.entry_p * self.position_size_usd) - self.order_fee
             self.potential_loss_usd = ((self.sl_p - self.entry_p) / self.entry_p * self.position_size_usd) - self.order_fee
-            self.tp_price_diff_percent = (self.potential_profit_usd / self.used_capital) * 100
-            self.sl_price_diff_percent = (self.potential_loss_usd / self.used_capital) * 100
+            self.tp_price_diff_percent = (self.potential_profit_usd / self.capital) * 100
+            self.sl_price_diff_percent = (self.potential_loss_usd / self.capital) * 100
 
         # Calculate percentages based on used capital
-        self.potential_profit_percent = (self.potential_profit_usd / self.used_capital) * 100
-        self.potential_loss_percent = (self.potential_loss_usd / self.used_capital) * 100
+        self.potential_profit_percent = (self.potential_profit_usd / self.capital) * 100
+        self.potential_loss_percent = (self.potential_loss_usd / self.capital) * 100
 
 class Backtester:
     def __init__(
@@ -118,7 +118,7 @@ class Backtester:
             position_size_usd=position_size_usd,
             tp_p=trade_info['tp_p'],
             sl_p=trade_info['sl_p'],
-            used_capital=required_capital,
+            capital=required_capital,
             leverage=self.leverage,
             spread_multiplier=self.spread_multiplier,
             fee_multiplier=self.fee_multiplier
@@ -148,8 +148,8 @@ class Backtester:
                 short_trade_should_close_at_tp = trade.type == 'short' and (row['close'] <= trade.tp_p)
                 long_trade_should_close_at_sl = trade.type == 'long' and (row['close'] <= trade.sl_p)
                 short_trade_should_close_at_sl = trade.type == 'short' and (row['close'] >= trade.sl_p)
-                long_trade_should_liquidate = trade.type == 'long' and (row['close'] <= trade.liq_p)
-                short_trade_should_liquidate = trade.type == 'short' and (row['close'] >= trade.liq_p)
+                long_trade_should_liquidate = trade.type == 'long' and (row['close'] <= trade.liq_p or trade.unrealized_pnl < (trade.capital * -0.99) )
+                short_trade_should_liquidate = trade.type == 'short' and (row['close'] >= trade.liq_p or trade.unrealized_pnl < (trade.capital * -0.99) )
                 
                 if self.exit_condition(trade, time, row, self.open_trades, self.closed_trades, timeframe):
                     self.close_trade(trade, time, row['close'], 'exit_condition')
@@ -187,7 +187,7 @@ class Backtester:
         trade.unrealized_pnl = 0
         self.open_trades.remove(trade)
         self.closed_trades.append(trade)
-        self.available_capital += trade.used_capital + trade.pnl
+        self.available_capital += trade.capital + trade.pnl
         self.trade_log.append(trade)
 
         print(f"{trade.close_time} - {trade.symbol} - CLOSED TRADE - {trade.type} - ENTRY: ${trade.entry_p:.3f} - CLOSE: ${close_price:.3f} - PNL: ${trade.pnl:.2f} - SL: ${trade.sl_p:.3f} - TP: ${trade.tp_p:.3f} - REASON: {reason} - AVAILABLE CAPITAL: ${self.available_capital:.3f}")
