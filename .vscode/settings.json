@@ -8,6 +8,7 @@
     "cumsum",
     "dataframe",
     "iloc",
+    "iterrows",
     "MACD",
     "metatrader",
     "sesto",

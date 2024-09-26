@@ -13,11 +13,11 @@ from datetime import timedelta
 class Trade:
     symbol: str
     entry_time: datetime
-    entry_p: float
+    entry_price: float
     type: str
     position_size_usd: float
-    tp_p: float
-    sl_p: float
+    tp_price: float
+    sl_price: float
     capital: float
     potential_profit_usd: float = field(init=False)
     potential_profit_percent: float = field(init=False)
@@ -41,29 +41,29 @@ class Trade:
 
     def __post_init__(self):
         if self.type == 'long':
-            self.entry_p = calculate_price_with_spread(self.entry_p, self.spread_multiplier, increase=True)
-            self.tp_p = calculate_price_with_spread(self.tp_p, self.spread_multiplier, increase=False)    
-            self.sl_p = calculate_price_with_spread(self.sl_p, self.spread_multiplier, increase=True)
+            self.entry_price = calculate_price_with_spread(self.entry_price, self.spread_multiplier, increase=True)
+            self.tp_price = calculate_price_with_spread(self.tp_price, self.spread_multiplier, increase=False)    
+            self.sl_price = calculate_price_with_spread(self.sl_price, self.spread_multiplier, increase=True)
         else:
-            self.entry_p = calculate_price_with_spread(self.entry_p, self.spread_multiplier, increase=False)
-            self.tp_p = calculate_price_with_spread(self.tp_p, self.spread_multiplier, increase=True)
-            self.sl_p = calculate_price_with_spread(self.sl_p, self.spread_multiplier, increase=False)
+            self.entry_price = calculate_price_with_spread(self.entry_price, self.spread_multiplier, increase=False)
+            self.tp_price = calculate_price_with_spread(self.tp_price, self.spread_multiplier, increase=True)
+            self.sl_price = calculate_price_with_spread(self.sl_price, self.spread_multiplier, increase=False)
 
         self.order_fee = calculate_fee(self.position_size_usd)
-        self.be_p = calculate_break_even_price(self.entry_p, self.order_fee, self.position_size_usd, self.type)
+        self.be_p = calculate_break_even_price(self.entry_price, self.order_fee, self.position_size_usd, self.type)
         self.calculate_potential_outcomes()
         
-        self.liq_p = calculate_liquidation_price(entry_price=self.entry_p, leverage=self.leverage, type=self.type)    
+        self.liq_p = calculate_liquidation_price(entry_price=self.entry_price, leverage=self.leverage, type=self.type)    
 
     def calculate_potential_outcomes(self):
         if self.type == 'long':            
-            self.potential_profit_usd = ((self.tp_p - self.entry_p ) / self.entry_p * self.position_size_usd) - self.order_fee
-            self.potential_loss_usd = ((self.entry_p - self.sl_p) / self.entry_p * self.position_size_usd) - self.order_fee
+            self.potential_profit_usd = ((self.tp_price - self.entry_price ) / self.entry_price * self.position_size_usd) - self.order_fee
+            self.potential_loss_usd = ((self.entry_price - self.sl_price) / self.entry_price * self.position_size_usd) - self.order_fee
             self.tp_price_diff_percent = (self.potential_profit_usd / self.capital) * 100
             self.sl_price_diff_percent = (self.potential_loss_usd / self.capital) * 100
         else:  # short position            
-            self.potential_profit_usd = ((self.entry_p - self.tp_p) / self.entry_p * self.position_size_usd) - self.order_fee
-            self.potential_loss_usd = ((self.sl_p - self.entry_p) / self.entry_p * self.position_size_usd) - self.order_fee
+            self.potential_profit_usd = ((self.entry_price - self.tp_price) / self.entry_price * self.position_size_usd) - self.order_fee
+            self.potential_loss_usd = ((self.sl_price - self.entry_price) / self.entry_price * self.position_size_usd) - self.order_fee
             self.tp_price_diff_percent = (self.potential_profit_usd / self.capital) * 100
             self.sl_price_diff_percent = (self.potential_loss_usd / self.capital) * 100
 
@@ -113,11 +113,11 @@ class Backtester:
         trade = Trade(
             symbol=symbol,
             entry_time=time,
-            entry_p=trade_info['entry_p'],
+            entry_price=trade_info['entry_price'],
             type=trade_info['type'],
             position_size_usd=position_size_usd,
-            tp_p=trade_info['tp_p'],
-            sl_p=trade_info['sl_p'],
+            tp_price=trade_info['tp_price'],
+            sl_price=trade_info['sl_price'],
             capital=required_capital,
             leverage=self.leverage,
             spread_multiplier=self.spread_multiplier,
@@ -126,7 +126,7 @@ class Backtester:
 
         self.open_trades.append(trade)
         self.available_capital -= required_capital + trade.order_fee
-        print(f"{time} - {symbol} - OPENED TRADE - {trade.type} - ENTRY: ${trade.entry_p:.3f} - TP: ${trade.tp_p:.3f} - SL: ${trade.sl_p:.3f} - LIQ: ${trade.liq_p:.3f} - BE: ${trade.be_p:.3f} - AVAILABLE CAPITAL: ${self.available_capital:.3f}")
+        print(f"{time} - {symbol} - OPENED TRADE - {trade.type} - ENTRY: ${trade.entry_price:.3f} - TP: ${trade.tp_price:.3f} - SL: ${trade.sl_price:.3f} - LIQ: ${trade.liq_p:.3f} - BE: ${trade.be_p:.3f} - AVAILABLE CAPITAL: ${self.available_capital:.3f}")
 
     def check_entry(self, symbol: str, time: datetime, row: pd.Series, timeframe: MT5Timeframe):
         trade_info = self.entry_condition(symbol, time, row, self.open_trades, self.closed_trades, timeframe)
@@ -144,29 +144,29 @@ class Backtester:
             if trade.symbol == symbol:
                 self.update_trade_metrics(trade, row)
 
-                long_trade_should_close_at_tp = trade.type == 'long' and (row['close'] >= trade.tp_p)
-                short_trade_should_close_at_tp = trade.type == 'short' and (row['close'] <= trade.tp_p)
-                long_trade_should_close_at_sl = trade.type == 'long' and (row['close'] <= trade.sl_p)
-                short_trade_should_close_at_sl = trade.type == 'short' and (row['close'] >= trade.sl_p)
+                long_trade_should_close_at_tp = trade.type == 'long' and (row['close'] >= trade.tp_price)
+                short_trade_should_close_at_tp = trade.type == 'short' and (row['close'] <= trade.tp_price)
+                long_trade_should_close_at_sl = trade.type == 'long' and (row['close'] <= trade.sl_price)
+                short_trade_should_close_at_sl = trade.type == 'short' and (row['close'] >= trade.sl_price)
                 long_trade_should_liquidate = trade.type == 'long' and (row['close'] <= trade.liq_p or trade.unrealized_pnl < (trade.capital * -0.99) )
                 short_trade_should_liquidate = trade.type == 'short' and (row['close'] >= trade.liq_p or trade.unrealized_pnl < (trade.capital * -0.99) )
                 
                 if self.exit_condition(trade, time, row, self.open_trades, self.closed_trades, timeframe):
                     self.close_trade(trade, time, row['close'], 'exit_condition')
                 elif long_trade_should_close_at_tp or short_trade_should_close_at_tp:
-                    self.close_trade(trade, time, trade.tp_p, 'TP')
+                    self.close_trade(trade, time, trade.tp_price, 'TP')
                 elif long_trade_should_liquidate or short_trade_should_liquidate:
-                    self.close_trade(trade, time, trade.sl_p, 'LIQ')
+                    self.close_trade(trade, time, trade.sl_price, 'LIQ')
                 elif long_trade_should_close_at_sl or short_trade_should_close_at_sl:
-                    self.close_trade(trade, time, trade.sl_p, 'SL')
+                    self.close_trade(trade, time, trade.sl_price, 'SL')
                 else:
                     self.trailing_stop(trade, time, row, self.open_trades, self.closed_trades, timeframe)
 
     def update_trade_metrics(self, trade: Trade, row: pd.Series):
         if trade.type == 'long':
-            trade.unrealized_pnl = ((row['close'] - trade.entry_p) / trade.entry_p * trade.position_size_usd) - trade.order_fee
+            trade.unrealized_pnl = ((row['close'] - trade.entry_price) / trade.entry_price * trade.position_size_usd) - trade.order_fee
         else:  # short position
-            trade.unrealized_pnl = ((trade.entry_p - row['close']) / trade.entry_p * trade.position_size_usd) - trade.order_fee
+            trade.unrealized_pnl = ((trade.entry_price - row['close']) / trade.entry_price * trade.position_size_usd) - trade.order_fee
 
         # Update max_drawdown and max_profit
         if trade.pnl is not None:
@@ -179,10 +179,10 @@ class Backtester:
         
         if trade.type == 'long':
             trade.close_price = close_price * (1 - self.spread_multiplier)
-            trade.pnl = ((trade.close_price - trade.entry_p) / trade.entry_p * trade.position_size_usd) - trade.order_fee
+            trade.pnl = ((trade.close_price - trade.entry_price) / trade.entry_price * trade.position_size_usd) - trade.order_fee
         else:  # short position
             trade.close_price = close_price * (1 + self.spread_multiplier)
-            trade.pnl = ((trade.entry_p - trade.close_price) / trade.entry_p * trade.position_size_usd) - trade.order_fee
+            trade.pnl = ((trade.entry_price - trade.close_price) / trade.entry_price * trade.position_size_usd) - trade.order_fee
                 
         trade.unrealized_pnl = 0
         self.open_trades.remove(trade)
@@ -190,7 +190,7 @@ class Backtester:
         self.available_capital += trade.capital + trade.pnl
         self.trade_log.append(trade)
 
-        print(f"{trade.close_time} - {trade.symbol} - CLOSED TRADE - {trade.type} - ENTRY: ${trade.entry_p:.3f} - CLOSE: ${close_price:.3f} - PNL: ${trade.pnl:.2f} - SL: ${trade.sl_p:.3f} - TP: ${trade.tp_p:.3f} - REASON: {reason} - AVAILABLE CAPITAL: ${self.available_capital:.3f}")
+        print(f"{trade.close_time} - {trade.symbol} - CLOSED TRADE - {trade.type} - ENTRY: ${trade.entry_price:.3f} - CLOSE: ${close_price:.3f} - PNL: ${trade.pnl:.2f} - SL: ${trade.sl_price:.3f} - TP: ${trade.tp_price:.3f} - REASON: {reason} - AVAILABLE CAPITAL: ${self.available_capital:.3f}")
 
     def close_all_trades(self, last_timestamp: datetime):
         for trade in self.open_trades[:]:  # Create a copy of the list to iterate over

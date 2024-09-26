@@ -18,11 +18,11 @@ def calculate_fee(position_size_usd: float) -> float:
     order_fee = (position_size_usd / 1000000) * 16 * 2
     return order_fee
 
-def calculate_break_even_price(entry_p: float, order_fee: float, position_size_usd: float, type: str) -> float:
+def calculate_break_even_price(entry_price: float, order_fee: float, position_size_usd: float, type: str) -> float:
     if type == 'long':
-        return entry_p * (1 + (order_fee / position_size_usd))
+        return entry_price * (1 + (order_fee / position_size_usd))
     elif type == 'short':
-        return entry_p * (1 - (order_fee / position_size_usd))
+        return entry_price * (1 - (order_fee / position_size_usd))
     else:
         raise ValueError(f"Unknown position type: {type}")
 
