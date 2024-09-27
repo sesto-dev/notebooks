@@ -8,6 +8,7 @@ from sesto.constants import MT5Timeframe
 from sesto.utils import calculate_position_size, get_price_at_pnl, calculate_fee, calculate_break_even_price, calculate_price_with_spread, calculate_liquidation_price
 import time
 from datetime import timedelta
+from IPython.display import display
 
 @dataclass
 class Trade:
@@ -144,12 +145,12 @@ class Backtester:
             if trade.symbol == symbol:
                 self.update_trade_metrics(trade, row)
 
-                long_trade_should_close_at_tp = trade.type == 'long' and (row['close'] >= trade.tp_price)
-                short_trade_should_close_at_tp = trade.type == 'short' and (row['close'] <= trade.tp_price)
-                long_trade_should_close_at_sl = trade.type == 'long' and (row['close'] <= trade.sl_price)
-                short_trade_should_close_at_sl = trade.type == 'short' and (row['close'] >= trade.sl_price)
-                long_trade_should_liquidate = trade.type == 'long' and (row['close'] <= trade.liq_p or trade.unrealized_pnl < (trade.capital * -0.99) )
-                short_trade_should_liquidate = trade.type == 'short' and (row['close'] >= trade.liq_p or trade.unrealized_pnl < (trade.capital * -0.99) )
+                long_trade_should_close_at_tp = trade.type == 'long' and (row['close'] >= trade.tp_price or row['high'] >= trade.tp_price or row['low'] >= trade.tp_price or row['open'] >= trade.tp_price)
+                short_trade_should_close_at_tp = trade.type == 'short' and (row['close'] <= trade.tp_price or row['high'] <= trade.tp_price or row['low'] <= trade.tp_price or row['open'] <= trade.tp_price)
+                long_trade_should_close_at_sl = trade.type == 'long' and (row['close'] <= trade.sl_price or row['high'] <= trade.sl_price or row['low'] <= trade.sl_price or row['open'] <= trade.sl_price)
+                short_trade_should_close_at_sl = trade.type == 'short' and (row['close'] >= trade.sl_price or row['high'] >= trade.sl_price or row['low'] >= trade.sl_price or row['open'] >= trade.sl_price)
+                long_trade_should_liquidate = trade.type == 'long' and (row['close'] <= trade.liq_p or row['high'] <= trade.liq_p or row['low'] <= trade.liq_p or row['open'] <= trade.liq_p or trade.unrealized_pnl < (trade.capital * -0.99) )
+                short_trade_should_liquidate = trade.type == 'short' and (row['close'] >= trade.liq_p or row['high'] >= trade.liq_p or row['low'] >= trade.liq_p or row['open'] >= trade.liq_p or trade.unrealized_pnl < (trade.capital * -0.99) )
                 
                 if self.exit_condition(trade, time, row, self.open_trades, self.closed_trades, timeframe):
                     self.close_trade(trade, time, row['close'], 'exit_condition')

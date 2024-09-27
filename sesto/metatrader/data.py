@@ -20,7 +20,10 @@ def fetch_data_pos(symbol: str, timeframe: MT5Timeframe, bars: int) -> pd.DataFr
             print(f"Failed to fetch data for symbol: {symbol} on timeframe: {timeframe}")
             return pd.DataFrame()
         df = pd.DataFrame(rates)
+        df.dropna(subset='time', inplace=True)
         df['time'] = pd.to_datetime(df['time'], unit='s')
+        df.reset_index(drop=True, inplace=True)
+        
         return df
     except Exception as e:
         print(f"Exception fetching data for {symbol} on {timeframe}: {e}")
@@ -33,7 +36,10 @@ def fetch_data_range(symbol: str, timeframe: MT5Timeframe, from_date: datetime, 
             print(f"Failed to fetch data for symbol: {symbol} on timeframe: {timeframe}")
             return pd.DataFrame()
         df = pd.DataFrame(rates)
+        df.dropna(subset='time', inplace=True)
         df['time'] = pd.to_datetime(df['time'], unit='s')
+        df.reset_index(drop=True, inplace=True)
+
         return df
     except Exception as e:
         print(f"Exception fetching data for {symbol} on {timeframe}: {e}")

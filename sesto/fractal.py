@@ -1,11 +1,6 @@
 import pandas as pd
 
 def high_low_finder(data):
-    data['time'] = pd.to_datetime(data['time'], unit='s')
-
-    data = data.dropna()
-    data.reset_index(drop=True, inplace=True)
-
     current_leg = False
     determination_candle = False
     hl_situation = False
