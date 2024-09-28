@@ -1,5 +1,5 @@
-def get_price_at_pnl(pnl_percentage: float, order_fee: float, position_size_usd: float, leverage: float, entry_price: float, type: str) -> float:
-    required_movement = (pnl_percentage / 100) + (order_fee / position_size_usd)
+def get_price_at_pnl(pnl_multiplier: float, order_fee: float, position_size_usd: float, leverage: float, entry_price: float, type: str) -> float:
+    required_movement = pnl_multiplier + (order_fee / position_size_usd)
     price_movement = required_movement / leverage
 
     if type == 'long':
@@ -10,6 +10,18 @@ def get_price_at_pnl(pnl_percentage: float, order_fee: float, position_size_usd:
         raise ValueError(f"Unknown trade type: {type}")
 
     return target_price
+
+def get_pnl_at_price(current_price: float, entry_price: float, position_size_usd: float, leverage: float, type: str) -> float:
+    if type == 'long':
+        price_change = (current_price - entry_price) / entry_price
+    elif type == 'short':
+        price_change = (entry_price - current_price) / entry_price
+    else:
+        raise ValueError(f"Unknown trade type: {type}")
+    
+    # Calculate the PNL as a percentage of the position size
+    pnl = position_size_usd * price_change
+    return pnl
 
 def calculate_position_size(capital: float, leverage: float) -> float:
     return capital * leverage

@@ -21,11 +21,7 @@ class Trade:
     sl_price: float
     capital: float
     potential_profit_usd: float = field(init=False)
-    potential_profit_percent: float = field(init=False)
     potential_loss_usd: float = field(init=False)
-    potential_loss_percent: float = field(init=False)
-    tp_price_diff_percent: float = field(init=False)
-    sl_price_diff_percent: float = field(init=False)
     close_time: datetime = None
     close_price: float = None
     pnl: float = None
@@ -38,18 +34,9 @@ class Trade:
     be_p: float = None
     order_fee: float = None
     spread_multiplier: float = 0.0001
-    fee_multiplier: float = 0.0001
+    
 
     def __post_init__(self):
-        if self.type == 'long':
-            self.entry_price = calculate_price_with_spread(self.entry_price, self.spread_multiplier, increase=True)
-            self.tp_price = calculate_price_with_spread(self.tp_price, self.spread_multiplier, increase=False)    
-            self.sl_price = calculate_price_with_spread(self.sl_price, self.spread_multiplier, increase=True)
-        else:
-            self.entry_price = calculate_price_with_spread(self.entry_price, self.spread_multiplier, increase=False)
-            self.tp_price = calculate_price_with_spread(self.tp_price, self.spread_multiplier, increase=True)
-            self.sl_price = calculate_price_with_spread(self.sl_price, self.spread_multiplier, increase=False)
-
         self.order_fee = calculate_fee(self.position_size_usd)
         self.be_p = calculate_break_even_price(self.entry_price, self.order_fee, self.position_size_usd, self.type)
         self.calculate_potential_outcomes()
@@ -58,19 +45,11 @@ class Trade:
 
     def calculate_potential_outcomes(self):
         if self.type == 'long':            
-            self.potential_profit_usd = ((self.tp_price - self.entry_price ) / self.entry_price * self.position_size_usd) - self.order_fee
-            self.potential_loss_usd = ((self.entry_price - self.sl_price) / self.entry_price * self.position_size_usd) - self.order_fee
-            self.tp_price_diff_percent = (self.potential_profit_usd / self.capital) * 100
-            self.sl_price_diff_percent = (self.potential_loss_usd / self.capital) * 100
+            self.potential_profit_usd = ((self.tp_price - self.entry_price ) / self.entry_price * self.position_size_usd)
+            self.potential_loss_usd = ((self.entry_price - self.sl_price) / self.entry_price * self.position_size_usd)
         else:  # short position            
-            self.potential_profit_usd = ((self.entry_price - self.tp_price) / self.entry_price * self.position_size_usd) - self.order_fee
-            self.potential_loss_usd = ((self.sl_price - self.entry_price) / self.entry_price * self.position_size_usd) - self.order_fee
-            self.tp_price_diff_percent = (self.potential_profit_usd / self.capital) * 100
-            self.sl_price_diff_percent = (self.potential_loss_usd / self.capital) * 100
-
-        # Calculate percentages based on used capital
-        self.potential_profit_percent = (self.potential_profit_usd / self.capital) * 100
-        self.potential_loss_percent = (self.potential_loss_usd / self.capital) * 100
+            self.potential_profit_usd = ((self.entry_price - self.tp_price) / self.entry_price * self.position_size_usd)
+            self.potential_loss_usd = ((self.sl_price - self.entry_price) / self.entry_price * self.position_size_usd)
 
 class Backtester:
     def __init__(
@@ -78,7 +57,6 @@ class Backtester:
         data: Dict[MT5Timeframe, Dict[str, pd.DataFrame]], 
         initial_capital: float, 
         main_timeframe: MT5Timeframe,
-        fee_multiplier: float = 0.0001,
         spread_multiplier: float = 0.0001,
         leverage: float = 500.0
     ):
@@ -89,7 +67,6 @@ class Backtester:
         self.open_trades: List[Trade] = []
         self.closed_trades: List[Trade] = []
         self.trade_log = []
-        self.fee_multiplier = fee_multiplier
         self.spread_multiplier = spread_multiplier
         self.leverage = leverage
         self.backtest_duration = None
@@ -111,10 +88,17 @@ class Backtester:
         self.backtest_duration = timedelta(seconds=end_time - start_time)
 
     def open_trade(self, symbol: str, time: datetime, required_capital: float, position_size_usd: float, trade_info: Dict):
+        entry_price = trade_info['entry_price']
+
+        if trade_info['type'] == 'long':
+            entry_price = calculate_price_with_spread(entry_price, self.spread_multiplier, increase=True)        
+        else:
+            entry_price = calculate_price_with_spread(entry_price, self.spread_multiplier, increase=False)
+    
         trade = Trade(
             symbol=symbol,
             entry_time=time,
-            entry_price=trade_info['entry_price'],
+            entry_price=entry_price,
             type=trade_info['type'],
             position_size_usd=position_size_usd,
             tp_price=trade_info['tp_price'],
@@ -122,12 +106,11 @@ class Backtester:
             capital=required_capital,
             leverage=self.leverage,
             spread_multiplier=self.spread_multiplier,
-            fee_multiplier=self.fee_multiplier
         )
 
         self.open_trades.append(trade)
         self.available_capital -= required_capital + trade.order_fee
-        print(f"{time} - {symbol} - OPENED TRADE - {trade.type} - ENTRY: ${trade.entry_price:.3f} - TP: ${trade.tp_price:.3f} - SL: ${trade.sl_price:.3f} - LIQ: ${trade.liq_p:.3f} - BE: ${trade.be_p:.3f} - AVAILABLE CAPITAL: ${self.available_capital:.3f}")
+        print(f"{time} - {symbol} - OPENED TRADE - {trade.type} - ENTRY: ${trade.entry_price:.3f} - TP: ${trade.tp_price:.3f} ({(trade.entry_price / trade.tp_price - 1) * 100:.3f}%) - SL: ${trade.sl_price:.3f} ({(trade.entry_price / trade.sl_price - 1) * 100:.3f}%) - LIQ: ${trade.liq_p:.3f} - BE: ${trade.be_p:.3f} - AVAILABLE CAPITAL: ${self.available_capital:.3f}")
 
     def check_entry(self, symbol: str, time: datetime, row: pd.Series, timeframe: MT5Timeframe):
         trade_info = self.entry_condition(symbol, time, row, self.open_trades, self.closed_trades, timeframe)

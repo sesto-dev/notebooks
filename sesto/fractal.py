@@ -51,40 +51,40 @@ def high_low_finder(data):
             elif high_base < high1:
                 #case 1
                 if not current_leg:
-                    current_leg = 'up'
-                    candle_side = 'up'
-                elif current_leg == 'up':
+                    current_leg = 'top'
+                    candle_side = 'top'
+                elif current_leg == 'top':
                         if ignore_case == '4':
                             ignore_case = False
                             candle_side = 0
                         else:
                             candle_side = 0
-                elif current_leg == 'down':
+                elif current_leg == 'bottom':
                     if ignore_case == '4':
                         candle_side = 0
-                        candle_side_list[determination_candle] = 'down'
+                        candle_side_list[determination_candle] = 'bottom'
                         ignore_case = False
-                        current_leg = 'up'
+                        current_leg = 'top'
                     else:
                         candle_side = 0
-                        candle_side_list[idx-1] = 'down'
-                        current_leg = 'up'
+                        candle_side_list[idx-1] = 'bottom'
+                        current_leg = 'top'
             elif low_base > low1:
                 #case 2
                 if not current_leg:
-                    current_leg = 'down'
-                    candle_side = 'down'
-                elif current_leg == 'up':
+                    current_leg = 'bottom'
+                    candle_side = 'bottom'
+                elif current_leg == 'top':
                         if ignore_case == '4':
                             candle_side = 0
-                            candle_side_list[determination_candle] = 'up'
-                            current_leg = 'down'
+                            candle_side_list[determination_candle] = 'top'
+                            current_leg = 'bottom'
                             ignore_case = False
                         else:
-                            candle_side_list[idx-1] = 'up'
-                            current_leg = 'down'
+                            candle_side_list[idx-1] = 'top'
+                            current_leg = 'bottom'
                             candle_side = 0
-                elif current_leg == 'down':
+                elif current_leg == 'bottom':
                     if ignore_case == '4':
                         candle_side = 0
                         ignore_case = False
@@ -133,41 +133,41 @@ def high_low_finder(data):
             elif high_base < high1:
                 #case 1
                 if not current_leg:
-                    current_leg = 'up'
-                    candle_side = 'up'
-                elif current_leg == 'up':
+                    current_leg = 'top'
+                    candle_side = 'top'
+                elif current_leg == 'top':
                         if ignore_case == '4':
                             candle_side = 0
-                            current_leg = 'up'
+                            current_leg = 'top'
                         else:
                             candle_side = 0
-                            current_leg = 'up'
-                elif current_leg == 'down':
+                            current_leg = 'top'
+                elif current_leg == 'bottom':
                     if ignore_case == '4':
                         candle_side = 0
-                        candle_side_list[determination_candle] = 'down'
-                        current_leg = 'up'
+                        candle_side_list[determination_candle] = 'bottom'
+                        current_leg = 'top'
                     else:
-                        candle_side_list[determination_candle] = 'down'
+                        candle_side_list[determination_candle] = 'bottom'
                         candle_side = 0
-                        current_leg = 'up'
+                        current_leg = 'top'
                 ignored = False
-                ignore_case == False
+                ignore_case = False
             elif low_base > low1:
                 #case 2
                 if not current_leg:
-                    current_leg = 'down'
-                    candle_side = 'down'
-                elif current_leg == 'up':
+                    current_leg = 'bottom'
+                    candle_side = 'bottom'
+                elif current_leg == 'top':
                         if ignore_case == '4':
                             candle_side = 0
-                            current_leg = 'down'
-                            candle_side_list[determination_candle] = 'up'
+                            current_leg = 'bottom'
+                            candle_side_list[determination_candle] = 'top'
                         else:
-                            candle_side_list[determination_candle] = 'up'
+                            candle_side_list[determination_candle] = 'top'
                             candle_side = 0
-                            current_leg = 'down'
-                elif current_leg == 'down':
+                            current_leg = 'bottom'
+                elif current_leg == 'bottom':
                     if ignore_case == '4':
                         candle_side = 0
                     else:
