@@ -1,13 +1,5 @@
 import MetaTrader5 as mt5
 import pandas as pd
-import logging
-
-# Configure logging
-logging.basicConfig(
-    filename='mt5_trading.log',
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s:%(message)s'
-)
 
 # Initialize and connect to MetaTrader 5
 if not mt5.initialize():
@@ -19,23 +11,23 @@ else:
 def send_market_order(symbol, volume, order_type, sl=0.0, tp=0.0,
                       deviation=20, comment='', magic=0, type_filling=mt5.ORDER_FILLING_IOC):
     if order_type not in ['buy', 'sell']:
-        logging.error(f"Invalid order_type: {order_type}. Must be 'buy' or 'sell'.")
+        print(f"Invalid order_type: {order_type}. Must be 'buy' or 'sell'.")
         return None
 
     if volume <= 0:
-        logging.error("Volume must be greater than 0.")
+        print("Volume must be greater than 0.")
         return None
 
     tick = mt5.symbol_info_tick(symbol)
     if tick is None:
-        logging.error(f"Failed to get tick for symbol: {symbol}")
+        print(f"Failed to get tick for symbol: {symbol}")
         return None
 
     order_type_dict = {'buy': mt5.ORDER_TYPE_BUY, 'sell': mt5.ORDER_TYPE_SELL}
     price_dict = {'buy': tick.ask, 'sell': tick.bid}
 
     if price_dict[order_type] == 0.0:
-        logging.error(f"Invalid price retrieved for symbol: {symbol} and order_type: {order_type}")
+        print(f"Invalid price retrieved for symbol: {symbol} and order_type: {order_type}")
         return None
 
     request = {
@@ -50,22 +42,25 @@ def send_market_order(symbol, volume, order_type, sl=0.0, tp=0.0,
         "magic": magic,
         "comment": comment,
         "type_time": mt5.ORDER_TIME_GTC,
-        "type_filling": type_filling,
+        "type_filling": mt5.ORDER_FILLING_FOK,
     }
 
     order_result = mt5.order_send(request)
 
-    if order_result.retcode != mt5.TRADE_RETCODE_DONE:
-        logging.error(f"Order failed for {symbol}: {order_result.comment}")
+    if order_result is None:
+        print(f"Order failed, error code: {mt5.last_error()}")
         return None
-
-    logging.info(f"Order successfully placed: {order_result}")
+    elif order_result.retcode != mt5.TRADE_RETCODE_DONE:
+        print(f"Order failed, retcode: {order_result.retcode}")
+        return None
+    
+    print(f"Order successfully placed: {order_result}")
     return order_result
 
 
 def close_position(position, deviation=20, magic=0, comment='', type_filling=mt5.ORDER_FILLING_IOC):
     if 'type' not in position or 'ticket' not in position:
-        logging.error("Position dictionary missing 'type' or 'ticket' keys.")
+        print("Position dictionary missing 'type' or 'ticket' keys.")
         return None
 
     order_type_dict = {
@@ -75,7 +70,7 @@ def close_position(position, deviation=20, magic=0, comment='', type_filling=mt5
 
     position_type = position['type']
     if position_type not in order_type_dict:
-        logging.error(f"Unknown position type: {position_type}")
+        print(f"Unknown position type: {position_type}")
         return None
 
     price_dict = {
@@ -85,12 +80,12 @@ def close_position(position, deviation=20, magic=0, comment='', type_filling=mt5
 
     tick = mt5.symbol_info_tick(position['symbol'])
     if tick is None:
-        logging.error(f"Failed to get tick for symbol: {position['symbol']}")
+        print(f"Failed to get tick for symbol: {position['symbol']}")
         return None
 
     price = price_dict[position_type]
     if price == 0.0:
-        logging.error(f"Invalid price retrieved for symbol: {position['symbol']}")
+        print(f"Invalid price retrieved for symbol: {position['symbol']}")
         return None
 
     request = {
@@ -110,10 +105,10 @@ def close_position(position, deviation=20, magic=0, comment='', type_filling=mt5
     order_result = mt5.order_send(request)
 
     if order_result.retcode != mt5.TRADE_RETCODE_DONE:
-        logging.error(f"Failed to close position {position['ticket']}: {order_result.comment}")
+        print(f"Failed to close position {position['ticket']}: {order_result.comment}")
         return None
 
-    logging.info(f"Position {position['ticket']} closed successfully.")
+    print(f"Position {position['ticket']} closed successfully.")
     return order_result
 
 
@@ -126,7 +121,7 @@ def close_all_positions(order_type='all', magic=None, type_filling=mt5.ORDER_FIL
     if mt5.positions_total() > 0:
         positions = mt5.positions_get()
         if positions is None:
-            logging.error("Failed to retrieve positions.")
+            print("Failed to retrieve positions.")
             return []
 
         positions_data = [pos._asdict() for pos in positions]
@@ -139,12 +134,12 @@ def close_all_positions(order_type='all', magic=None, type_filling=mt5.ORDER_FIL
         # Filtering by order_type if not 'all'
         if order_type != 'all':
             if order_type not in order_type_dict:
-                logging.error(f"Invalid order_type: {order_type}. Must be 'buy', 'sell', or 'all'.")
+                print(f"Invalid order_type: {order_type}. Must be 'buy', 'sell', or 'all'.")
                 return []
             positions_df = positions_df[positions_df['type'] == order_type_dict[order_type]]
 
         if positions_df.empty:
-            logging.info('No open positions matching the criteria.')
+            print('No open positions matching the criteria.')
             return []
 
         results = []
@@ -153,24 +148,24 @@ def close_all_positions(order_type='all', magic=None, type_filling=mt5.ORDER_FIL
             if order_result:
                 results.append(order_result)
             else:
-                logging.error(f"Failed to close position {position['ticket']}.")
+                print(f"Failed to close position {position['ticket']}.")
         
         return results
     else:
-        logging.info("No open positions to close.")
+        print("No open positions to close.")
         return []
 
 
 def modify_sl_tp(ticket, stop_loss, take_profit):
     if not isinstance(ticket, int):
-        logging.error("Ticket must be an integer.")
+        print("Ticket must be an integer.")
         return None
 
     try:
         stop_loss = float(stop_loss)
         take_profit = float(take_profit)
     except ValueError:
-        logging.error("Stop loss and take profit must be numbers.")
+        print("Stop loss and take profit must be numbers.")
         return None
 
     request = {
@@ -183,10 +178,10 @@ def modify_sl_tp(ticket, stop_loss, take_profit):
     res = mt5.order_send(request)
 
     if res.retcode != mt5.TRADE_RETCODE_DONE:
-        logging.error(f"Failed to modify SL/TP for ticket {ticket}: {res.comment}")
+        print(f"Failed to modify SL/TP for ticket {ticket}: {res.comment}")
         return None
 
-    logging.info(f"SL/TP modified for ticket {ticket} successfully.")
+    print(f"SL/TP modified for ticket {ticket} successfully.")
     return res
 
 def get_positions(magic=None):
@@ -194,7 +189,7 @@ def get_positions(magic=None):
     if total_positions > 0:
         positions = mt5.positions_get()
         if positions is None:
-            logging.error("Failed to retrieve positions.")
+            print("Failed to retrieve positions.")
             return pd.DataFrame()
 
         positions_data = [pos._asdict() for pos in positions]
@@ -205,7 +200,7 @@ def get_positions(magic=None):
 
         return positions_df
     else:
-        logging.info("No open positions found.")
+        print("No open positions found.")
         return pd.DataFrame(columns=['ticket', 'time', 'time_msc', 'time_update', 'time_update_msc', 'type',
                                      'magic', 'identifier', 'reason', 'volume', 'price_open', 'sl', 'tp',
                                      'price_current', 'swap', 'profit', 'symbol', 'comment', 'external_id'])
