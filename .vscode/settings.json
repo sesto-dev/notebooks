@@ -1,8 +1,10 @@
 {
   "cSpell.words": [
+    "AUDJPY",
     "BACKTEST",
     "Backtester",
     "Bollinger",
+    "CADJPY",
     "Calmar",
     "cummax",
     "cumsum",
@@ -11,7 +13,9 @@
     "iterrows",
     "MACD",
     "metatrader",
+    "NZDJPY",
     "sesto",
+    "SOLANA",
     "sortino",
     "timeframes",
     "tradingview",

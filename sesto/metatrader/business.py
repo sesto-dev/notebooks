@@ -189,7 +189,6 @@ def modify_sl_tp(ticket, stop_loss, take_profit):
     logging.info(f"SL/TP modified for ticket {ticket} successfully.")
     return res
 
-
 def get_positions(magic=None):
     total_positions = mt5.positions_total()
     if total_positions > 0:
