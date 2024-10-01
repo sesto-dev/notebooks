@@ -1,3 +1,5 @@
+import MetaTrader5 as mt5
+
 def get_price_at_pnl(pnl_multiplier: float, order_fee: float, position_size_usd: float, leverage: float, entry_price: float, type: str) -> float:
     required_movement = pnl_multiplier + (order_fee / position_size_usd)
     price_movement = required_movement / leverage
@@ -53,3 +55,23 @@ def calculate_liquidation_price(entry_price: float, leverage: float, type: str) 
         raise ValueError(f"Unknown position type: {type}")
     
     return liq_p
+
+def convert_lots_to_usd(symbol, lots, price_open):
+    """
+    Convert volume size from lots to USD amount.
+    
+    :param symbol: The trading symbol (e.g., 'BITCOIN', 'ETHEREUM')
+    :param lots: The volume size in lots
+    :return: The equivalent USD amount
+    """
+    # Get the contract size for the symbol
+    symbol_info = mt5.symbol_info(symbol)
+    if symbol_info is None:
+        raise ValueError(f"Symbol {symbol} not found in MetaTrader 5")
+    
+    contract_size = symbol_info.trade_contract_size
+    
+    # Calculate the USD amount using the opening price
+    usd_amount = lots * contract_size * price_open
+    
+    return usd_amount

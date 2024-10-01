@@ -12,6 +12,7 @@ class NobitexClient:
 
     def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
         url = f"{NobitexConfig.BASE_URL}{endpoint}"
+        print(f"Requesting URL: {url}")  # Add this line
         response = self.session.request(method, url, **kwargs)
         
         try:
