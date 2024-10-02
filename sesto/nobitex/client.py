@@ -1,6 +1,7 @@
 import requests
 from typing import Dict, Any, Optional
 from .config import NobitexConfig
+from .endpoints import NobitexEndpoints
 from .models import NobitexSymbol, OrderSide, OrderType
 from .exceptions import NobitexAPIException, NobitexRequestException
 
@@ -11,8 +12,8 @@ class NobitexClient:
         self.session.headers.update({"Authorization": f"Token {self.api_key}"})
 
     def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
-        url = f"{NobitexConfig.BASE_URL}{endpoint}"
-        print(f"Requesting URL: {url}")  # Add this line
+        url = endpoint
+        print(f"Requesting URL: {url}")
         response = self.session.request(method, url, **kwargs)
         
         try:
@@ -26,14 +27,13 @@ class NobitexClient:
         return data
 
     def get_order_book(self, symbol: NobitexSymbol) -> Dict[str, Any]:
-        return self._request("GET", f"{NobitexConfig.ENDPOINTS['order_book']}/{symbol.value}")
+        return self._request("GET", NobitexEndpoints.order_book(symbol.value))
 
     def get_trades(self, symbol: NobitexSymbol) -> Dict[str, Any]:
-        return self._request("GET", f"{NobitexConfig.ENDPOINTS['trades']}/{symbol.value}")
+        return self._request("GET", NobitexEndpoints.trades(symbol.value))
 
-    def get_stats(self, src_currency: str, dst_currency: str) -> Dict[str, Any]:
-        params = {"srcCurrency": src_currency, "dstCurrency": dst_currency}
-        return self._request("GET", NobitexConfig.ENDPOINTS['stats'], params=params)
+    def get_stats(self) -> Dict[str, Any]:
+        return self._request("GET", NobitexEndpoints.stats())
 
     def place_order(self, symbol: NobitexSymbol, side: OrderSide, order_type: OrderType,
                     price: float, amount: float) -> Dict[str, Any]:
@@ -45,17 +45,26 @@ class NobitexClient:
             "amount": str(amount),
             "price": str(price)
         }
-        return self._request("POST", NobitexConfig.ENDPOINTS['post_order'], json=data)
+        return self._request("POST", NobitexEndpoints.post_order(), json=data)
 
     def get_order_status(self, client_order_id: str) -> Dict[str, Any]:
         params = {"clientOrderId": client_order_id}
-        return self._request("GET", NobitexConfig.ENDPOINTS['order_status'], params=params)
+        return self._request("GET", NobitexEndpoints.order_status(), params=params)
 
     def get_my_orders(self, symbol: Optional[NobitexSymbol] = None) -> Dict[str, Any]:
         params = {}
         if symbol:
             params["symbol"] = symbol.value
-        return self._request("GET", NobitexConfig.ENDPOINTS['my_orders'], params=params)
+        return self._request("GET", NobitexEndpoints.my_orders(), params=params)
 
     def cancel_order(self, client_order_id: str) -> Dict[str, Any]:
-        return self._request("DELETE", f"{NobitexConfig.ENDPOINTS['cancel_order']}/{client_order_id}")
+        return self._request("DELETE", NobitexEndpoints.cancel_order(client_order_id))
+    
+    def get_available_markets(self) -> Dict[str, Any]:
+        return self._request("GET", NobitexEndpoints.margin_markets_list())
+
+    def close_position(self, position_id: str) -> Dict[str, Any]:
+        return self._request("POST", NobitexEndpoints.close_position(position_id))
+
+    def get_positions(self) -> Dict[str, Any]:
+        return self._request("GET", NobitexEndpoints.positions_list())

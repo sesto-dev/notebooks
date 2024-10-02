@@ -200,7 +200,6 @@ def get_positions(magic=None):
 
         return positions_df
     else:
-        print("No open positions found.")
         return pd.DataFrame(columns=['ticket', 'time', 'time_msc', 'time_update', 'time_update_msc', 'type',
                                      'magic', 'identifier', 'reason', 'volume', 'price_open', 'sl', 'tp',
                                      'price_current', 'swap', 'profit', 'symbol', 'comment', 'external_id'])
