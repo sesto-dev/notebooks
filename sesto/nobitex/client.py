@@ -4,6 +4,7 @@ from .config import NobitexConfig
 from .endpoints import NobitexEndpoints
 from .models import NobitexSymbol, OrderSide, OrderType
 from .exceptions import NobitexAPIException, NobitexRequestException
+from IPython import display
 
 class NobitexClient:
     def __init__(self, api_key: str):
@@ -58,13 +59,42 @@ class NobitexClient:
         return self._request("GET", NobitexEndpoints.my_orders(), params=params)
 
     def cancel_order(self, client_order_id: str) -> Dict[str, Any]:
-        return self._request("DELETE", NobitexEndpoints.cancel_order(client_order_id))
+        return self._request("POST", NobitexEndpoints.cancel_order(client_order_id))
+    
+    def cancel_all_orders(self, hours: Optional[float] = None, execution: Optional[str] = None,
+                          trade_type: Optional[str] = None, src_currency: Optional[str] = None,
+                          dst_currency: Optional[str] = None) -> Dict[str, Any]:
+        data = {}
+        if hours is not None:
+            data['hours'] = hours
+        if execution:
+            data['execution'] = execution
+        if trade_type:
+            data['tradeType'] = trade_type
+        if src_currency:
+            data['srcCurrency'] = src_currency
+        if dst_currency:
+            data['dstCurrency'] = dst_currency
+        
+        return self._request("POST", NobitexEndpoints.cancel_all_orders(), json=data)
     
     def get_available_markets(self) -> Dict[str, Any]:
         return self._request("GET", NobitexEndpoints.margin_markets_list())
 
     def close_position(self, position_id: str) -> Dict[str, Any]:
         return self._request("POST", NobitexEndpoints.close_position(position_id))
+    
+    def modify_sl_tp(self, position_id: str, mode: str, amount: float, price: float,
+                    stop_price: float, stop_limit_price: float) -> Dict[str, Any]:
+        data = {
+            "positionId": position_id,
+            "mode": mode,
+            "amount": str(amount),
+            "price": str(price),
+            "stopPrice": str(stop_price),
+            "stopLimitPrice": str(stop_limit_price)
+        }
+        return self._request("POST", NobitexEndpoints.close_position(position_id), json=data)
 
     def get_positions(self) -> Dict[str, Any]:
         return self._request("GET", NobitexEndpoints.positions_list())

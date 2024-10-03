@@ -36,6 +36,10 @@ class NobitexEndpoints:
         return f"{NobitexEndpoints.BASE_URL}/market/orders/update-status/{client_order_id}"
     
     @staticmethod
+    def cancel_all_orders() -> str:
+        return f"{NobitexEndpoints.BASE_URL}/market/orders/cancel-old"
+    
+    @staticmethod
     def close_position(position_id: str) -> str:
         return f"{NobitexEndpoints.BASE_URL}/positions/{position_id}/close"
 
