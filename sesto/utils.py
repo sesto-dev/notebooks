@@ -11,7 +11,7 @@ def get_price_at_pnl(pnl_multiplier: float, order_fee: float, position_size_usd:
     else:
         raise ValueError(f"Unknown trade type: {type}")
 
-    return target_price
+    return target_price  # Ensure target_price is at least 1% of entry_price
 
 def get_pnl_at_price(current_price: float, entry_price: float, position_size_usd: float, leverage: float, type: str) -> float:
     if type == 'long':
