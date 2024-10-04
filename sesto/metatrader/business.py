@@ -1,5 +1,6 @@
 import MetaTrader5 as mt5
 import pandas as pd
+from datetime import datetime
 
 # Initialize and connect to MetaTrader 5
 if not mt5.initialize():
@@ -54,7 +55,7 @@ def send_market_order(symbol, volume, order_type, sl=0.0, tp=0.0,
         print(f"Order failed, retcode: {order_result.retcode}")
         return None
     
-    print(f"Order successfully placed: {order_result}")
+    print(f"Order successfully placed for {symbol}")
     return order_result
 
 
@@ -203,3 +204,62 @@ def get_positions(magic=None):
         return pd.DataFrame(columns=['ticket', 'time', 'time_msc', 'time_update', 'time_update_msc', 'type',
                                      'magic', 'identifier', 'reason', 'volume', 'price_open', 'sl', 'tp',
                                      'price_current', 'swap', 'profit', 'symbol', 'comment', 'external_id'])
+    
+
+def get_deal_from_ticket(ticket, from_date=None, to_date=None):
+    if not isinstance(ticket, int):
+        print("Ticket must be an integer.")
+        return None
+
+    # Define default date range if not provided
+    if from_date is None or to_date is None:
+        # Retrieve the last 30 days by default
+        to_date = datetime.now()
+        from_date = to_date - pd.Timedelta(days=30)
+
+    # Convert datetime to MT5 time (integer)
+    from_timestamp = int(from_date.timestamp())
+    to_timestamp = int(to_date.timestamp())
+
+    # Retrieve deals using the specified date range and ticket
+    deals = mt5.history_deals_get(from_timestamp, to_timestamp, ticket=ticket)
+    if not deals:
+        print(f"No deal history found for ticket {ticket} between {from_date} and {to_date}.")
+        return None
+
+    # Convert deals to a DataFrame for easier processing
+    deals_df = pd.DataFrame([deal._asdict() for deal in deals])
+
+    # Extract relevant information
+    deal_details = {
+        'ticket': ticket,
+        'symbol': deals_df['symbol'].iloc[0],
+        'type': 'buy' if deals_df['type'].iloc[0] == mt5.DEAL_TYPE_BUY else 'sell',
+        'volume': deals_df['volume'].sum(),
+        'open_time': datetime.fromtimestamp(deals_df['time'].min()),
+        'close_time': datetime.fromtimestamp(deals_df['time'].max()),
+        'open_price': deals_df['price'].iloc[0],
+        'close_price': deals_df['price'].iloc[-1],
+        'profit': deals_df['profit'].sum(),
+        'commission': deals_df['commission'].sum(),
+        'swap': deals_df['swap'].sum(),
+        'comment': deals_df['comment'].iloc[0]
+    }
+
+    return deal_details
+
+def get_order_from_ticket(ticket):
+    if not isinstance(ticket, int):
+        print("Ticket must be an integer.")
+        return None
+
+    # Get the order history
+    order = mt5.history_orders_get(ticket=ticket)
+    if order is None or len(order) == 0:
+        print(f"No order history found for ticket {ticket}")
+        return None
+
+    # Convert order to a dictionary
+    order_dict = order[0]._asdict()
+
+    return order_dict
