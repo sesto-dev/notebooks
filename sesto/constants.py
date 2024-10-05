@@ -2,6 +2,7 @@ from enum import Enum
 import MetaTrader5 as mt5
 from typing import List, Dict, Callable, Optional
 from dataclasses import dataclass, field
+import pytz
 
 class MT5Timeframe(Enum):
     M1 = mt5.TIMEFRAME_M1       # 1-minute
@@ -14,6 +15,9 @@ class MT5Timeframe(Enum):
     W1 = mt5.TIMEFRAME_W1       # weekly
     MN1 = mt5.TIMEFRAME_MN1     # monthly
 
+TIMEZONE = pytz.timezone('UTC')
+METALS = ['XAUUSD', 'XAGUSD']
+OILS = ['BRN', 'NG', 'WTI']
 CRYPTOCURRENCIES = ['BITCOIN', 'ETHEREUM', 'SOLANA', 'DOGECOIN', 'LITECOIN', 'RIPPLE', 'BNB', 'UNISWAP', 'AVALANCH', 'CARDANO', 'CHAINLINK', 'POLKADOT', 'POLYGON', 'COSMOS', 'AXS']
 CURRENCY_PAIRS: List[str] = ['USDJPY','USDCHF','USDCAD','EURUSD','EURGBP','EURJPY','EURCHF','EURCAD','EURAUD','EURNZD','GBPUSD','GBPJPY','GBPCHF','GBPCAD','GBPAUD','GBPNZD','CHFJPY','CADJPY','CADCHF','AUDUSD','AUDJPY','AUDCHF','AUDCAD','AUDNZD','NZDUSD','NZDJPY','NZDCHF','NZDCAD']
 CURRENCIES: List[str] = ["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"]

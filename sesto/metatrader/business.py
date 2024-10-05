@@ -1,10 +1,11 @@
 import MetaTrader5 as mt5
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
+from sesto.constants import TIMEZONE
 
 # Initialize and connect to MetaTrader 5
 if not mt5.initialize():
-    print("initialize() failed, error code =", mt5.last_error())
+    print(f"initialize() failed, error code = {mt5.last_error()}")
     quit()
 else:
     print("MetaTrader5 initialized successfully")
@@ -43,7 +44,7 @@ def send_market_order(symbol, volume, order_type, sl=0.0, tp=0.0,
         "magic": magic,
         "comment": comment,
         "type_time": mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_FOK,
+        "type_filling": type_filling,
     }
 
     order_result = mt5.order_send(request)
@@ -74,15 +75,15 @@ def close_position(position, deviation=20, magic=0, comment='', type_filling=mt5
         print(f"Unknown position type: {position_type}")
         return None
 
-    price_dict = {
-        0: mt5.symbol_info_tick(position['symbol']).ask,  # Buy order uses Ask price
-        1: mt5.symbol_info_tick(position['symbol']).bid   # Sell order uses Bid price
-    }
-
     tick = mt5.symbol_info_tick(position['symbol'])
     if tick is None:
         print(f"Failed to get tick for symbol: {position['symbol']}")
         return None
+
+    price_dict = {
+        0: tick.ask,  # Buy order uses Ask price
+        1: tick.bid   # Sell order uses Bid price
+    }
 
     price = price_dict[position_type]
     if price == 0.0:
@@ -185,6 +186,7 @@ def modify_sl_tp(ticket, stop_loss, take_profit):
     print(f"SL/TP modified for ticket {ticket} successfully.")
     return res
 
+
 def get_positions(magic=None):
     total_positions = mt5.positions_total()
     if total_positions > 0:
@@ -213,22 +215,26 @@ def get_deal_from_ticket(ticket, from_date=None, to_date=None):
 
     # Define default date range if not provided
     if from_date is None or to_date is None:
-        # Retrieve the last 30 days by default
-        to_date = datetime.now()
-        from_date = to_date - pd.Timedelta(days=30)
+        to_date = datetime.now(TIMEZONE)
+        from_date = to_date - timedelta(minutes=15)  # Adjust based on polling interval
 
     # Convert datetime to MT5 time (integer)
     from_timestamp = int(from_date.timestamp())
     to_timestamp = int(to_date.timestamp())
 
-    # Retrieve deals using the specified date range and ticket
-    deals = mt5.history_deals_get(from_timestamp, to_timestamp, ticket=ticket)
+    # Retrieve deals using the specified date range and position
+    deals = mt5.history_deals_get(from_timestamp, to_timestamp, position=ticket)
     if not deals:
-        print(f"No deal history found for ticket {ticket} between {from_date} and {to_date}.")
+        print(f"No deal history found for position ticket {ticket} between {from_date} and {to_date}.")
         return None
 
     # Convert deals to a DataFrame for easier processing
     deals_df = pd.DataFrame([deal._asdict() for deal in deals])
+
+    # Optional: Verify that all deals belong to the same symbol
+    if not all(deal['symbol'] == deals_df['symbol'].iloc[0] for deal in deals):
+        print(f"Inconsistent symbols found in deals for position ticket {ticket}.")
+        return None
 
     # Extract relevant information
     deal_details = {
@@ -236,17 +242,18 @@ def get_deal_from_ticket(ticket, from_date=None, to_date=None):
         'symbol': deals_df['symbol'].iloc[0],
         'type': 'buy' if deals_df['type'].iloc[0] == mt5.DEAL_TYPE_BUY else 'sell',
         'volume': deals_df['volume'].sum(),
-        'open_time': datetime.fromtimestamp(deals_df['time'].min()),
-        'close_time': datetime.fromtimestamp(deals_df['time'].max()),
+        'open_time': datetime.fromtimestamp(deals_df['time'].min(), tz=TIMEZONE),
+        'close_time': datetime.fromtimestamp(deals_df['time'].max(), tz=TIMEZONE),
         'open_price': deals_df['price'].iloc[0],
         'close_price': deals_df['price'].iloc[-1],
         'profit': deals_df['profit'].sum(),
         'commission': deals_df['commission'].sum(),
         'swap': deals_df['swap'].sum(),
-        'comment': deals_df['comment'].iloc[0]
+        'comment': deals_df['comment'].iloc[-1]  # Use the last comment if multiple
     }
 
     return deal_details
+
 
 def get_order_from_ticket(ticket):
     if not isinstance(ticket, int):

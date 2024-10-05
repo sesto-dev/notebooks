@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from sesto.performance import performance
 from sesto.constants import MT5Timeframe
-from sesto.utils import calculate_position_size, get_price_at_pnl, calculate_fee, calculate_break_even_price, calculate_price_with_spread, calculate_liquidation_price
+from sesto.utils import calculate_position_size, get_price_at_pnl, calculate_commission, calculate_break_even_price, calculate_price_with_spread, calculate_liquidation_price
 import time
 from datetime import timedelta
 from IPython.display import display
@@ -37,7 +37,7 @@ class Trade:
     
 
     def __post_init__(self):
-        self.order_fee = calculate_fee(self.position_size_usd)
+        self.order_fee = calculate_commission(self.position_size_usd)
         self.be_p = calculate_break_even_price(self.entry_price, self.order_fee, self.position_size_usd, self.type)
         self.calculate_potential_outcomes()
         

@@ -33,12 +33,23 @@ class TelegramSender:
 
     def send_json_message(self, json_data: dict) -> bool:
         """
-        Sends a JSON object as a formatted code block in the Telegram channel.
-
+        Sends a JSON object as a formatted code block in the Telegram channel,
+        converting any datetime properties to ISO format to ensure serializability.
+    
         :param json_data: The JSON data to send.
         :return: True if the message was sent successfully, False otherwise.
         """
         import json
-        json_formatted = json.dumps(json_data, indent=4)
+        from datetime import datetime
+        
+        # Serialize the data to a JSON-formatted string, handling datetime objects
+        json_formatted = json.dumps(
+            json_data,
+            indent=4,
+            default=lambda o: o.isoformat() if isinstance(o, datetime) else str(o)
+        )
+        
+        # Prepare the message with a JSON code block
         message = f"```json\n{json_formatted}\n```"
+        
         return self.send_message(message)
