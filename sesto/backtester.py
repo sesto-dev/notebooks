@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from sesto.performance import performance
 from sesto.constants import MT5Timeframe
-from sesto.utils import calculate_position_size, get_price_at_pnl, calculate_commission, calculate_break_even_price, calculate_price_with_spread, calculate_liquidation_price
+from sesto.utils import calculate_position_size, calculate_commission, get_price_at_pnl, calculate_price_with_spread, calculate_liquidation_price
 import time
 from datetime import timedelta
 from IPython.display import display
@@ -25,31 +25,35 @@ class Trade:
     close_time: datetime = None
     close_price: float = None
     pnl: float = None
+    pnl_excluding_commission: float = None
     max_drawdown: float = 0
     max_profit: float = 0
     closing_reason: str = None
     unrealized_pnl: float = 0
+    unrealized_pnl_excluding_commission: float = 0
     leverage: float = 500.0
     liq_p: float = None
     be_p: float = None
-    order_fee: float = None
+    order_commission: float = None
     spread_multiplier: float = 0.0001
+    triggered_trailing_stop: bool = False
+    trailing_stop_desired_pnl: float = None
     
-
     def __post_init__(self):
-        self.order_fee = calculate_commission(self.position_size_usd)
-        self.be_p = calculate_break_even_price(self.entry_price, self.order_fee, self.position_size_usd, self.type)
+        self.order_commission = calculate_commission(self.position_size_usd, self.symbol)
+        be_p, be_p_excluding_commission = get_price_at_pnl(desired_pnl=0, commission=self.order_commission, position_size_usd=self.position_size_usd, leverage=self.leverage, entry_price=self.entry_price, type=self.type)
+        self.be_p = be_p
         self.calculate_potential_outcomes()
         
         self.liq_p = calculate_liquidation_price(entry_price=self.entry_price, leverage=self.leverage, type=self.type)    
 
     def calculate_potential_outcomes(self):
         if self.type == 'long':            
-            self.potential_profit_usd = ((self.tp_price - self.entry_price ) / self.entry_price * self.position_size_usd)
-            self.potential_loss_usd = ((self.entry_price - self.sl_price) / self.entry_price * self.position_size_usd)
+            self.potential_profit_usd = ((self.tp_price - self.entry_price ) / self.entry_price * self.position_size_usd) - self.order_commission
+            self.potential_loss_usd = ((self.entry_price - self.sl_price) / self.entry_price * self.position_size_usd) + self.order_commission
         else:  # short position            
-            self.potential_profit_usd = ((self.entry_price - self.tp_price) / self.entry_price * self.position_size_usd)
-            self.potential_loss_usd = ((self.sl_price - self.entry_price) / self.entry_price * self.position_size_usd)
+            self.potential_profit_usd = ((self.entry_price - self.tp_price) / self.entry_price * self.position_size_usd) - self.order_commission
+            self.potential_loss_usd = ((self.sl_price - self.entry_price) / self.entry_price * self.position_size_usd) + self.order_commission
 
 class Backtester:
     def __init__(
@@ -109,8 +113,8 @@ class Backtester:
         )
 
         self.open_trades.append(trade)
-        self.available_capital -= required_capital + trade.order_fee
-        print(f"{time} - {symbol} - OPENED TRADE - {trade.type} - ENTRY: ${trade.entry_price:.3f} - TP: ${trade.tp_price:.3f} ({(trade.entry_price / trade.tp_price - 1) * 100:.3f}%) - SL: ${trade.sl_price:.3f} ({(trade.entry_price / trade.sl_price - 1) * 100:.3f}%) - LIQ: ${trade.liq_p:.3f} - BE: ${trade.be_p:.3f} - AVAILABLE CAPITAL: ${self.available_capital:.3f}")
+        self.available_capital -= required_capital + trade.order_commission
+        print(f"{symbol} - OPENED TRADE    - {trade.type.upper()} - ENTRY: ${trade.entry_price:.3f} - TP: ${trade.tp_price:.3f} ({(trade.entry_price / trade.tp_price - 1) * 100:.3f}% DIFF ENTRY)( PNL AT TP: ${trade.potential_profit_usd:.2f}) - SL: ${trade.sl_price:.3f} ({(trade.entry_price / trade.sl_price - 1) * 100:.3f}%) - LIQ: ${trade.liq_p:.3f} - BE: ${trade.be_p:.3f} - AVAILABLE CAPITAL: ${self.available_capital:.3f}")
 
     def check_entry(self, symbol: str, time: datetime, row: pd.Series, timeframe: MT5Timeframe):
         trade_info = self.entry_condition(symbol, time, row, self.open_trades, self.closed_trades, timeframe)
@@ -121,7 +125,7 @@ class Backtester:
             if capital <= self.available_capital:
                 self.open_trade(symbol, time, capital, position_size_usd, trade_info)
             else:
-                print(f"Not enough capital to open trade for {symbol} at {time}")
+                print(f"{symbol} - NOT ENOUGH CAPITAL - Trade Capital: ${capital} - Available Capital: ${self.available_capital}")
 
     def update_open_trades(self, symbol: str, time: datetime, row: pd.Series, timeframe: MT5Timeframe):
         for trade in self.open_trades[:]:
@@ -148,9 +152,11 @@ class Backtester:
 
     def update_trade_metrics(self, trade: Trade, row: pd.Series):
         if trade.type == 'long':
-            trade.unrealized_pnl = ((row['close'] - trade.entry_price) / trade.entry_price * trade.position_size_usd) - trade.order_fee
+            trade.unrealized_pnl = ((row['close'] - trade.entry_price) / trade.entry_price * trade.position_size_usd) - trade.order_commission
+            trade.unrealized_pnl_excluding_commission = ((row['close'] - trade.entry_price) / trade.entry_price * trade.position_size_usd)
         else:  # short position
-            trade.unrealized_pnl = ((trade.entry_price - row['close']) / trade.entry_price * trade.position_size_usd) - trade.order_fee
+            trade.unrealized_pnl = ((trade.entry_price - row['close']) / trade.entry_price * trade.position_size_usd) - trade.order_commission
+            trade.unrealized_pnl_excluding_commission = ((trade.entry_price - row['close']) / trade.entry_price * trade.position_size_usd)
 
         # Update max_drawdown and max_profit
         if trade.pnl is not None:
@@ -163,18 +169,20 @@ class Backtester:
         
         if trade.type == 'long':
             trade.close_price = close_price * (1 - self.spread_multiplier)
-            trade.pnl = ((trade.close_price - trade.entry_price) / trade.entry_price * trade.position_size_usd) - trade.order_fee
+            trade.pnl = ((trade.close_price - trade.entry_price) / trade.entry_price * trade.position_size_usd) - trade.order_commission
+            trade.pnl_excluding_commission = ((trade.close_price - trade.entry_price) / trade.entry_price * trade.position_size_usd)
         else:  # short position
             trade.close_price = close_price * (1 + self.spread_multiplier)
-            trade.pnl = ((trade.entry_price - trade.close_price) / trade.entry_price * trade.position_size_usd) - trade.order_fee
-                
+            trade.pnl = ((trade.entry_price - trade.close_price) / trade.entry_price * trade.position_size_usd) - trade.order_commission
+            trade.pnl_excluding_commission = ((trade.entry_price - trade.close_price) / trade.entry_price * trade.position_size_usd)
         trade.unrealized_pnl = 0
+        trade.unrealized_pnl_excluding_commission = 0
         self.open_trades.remove(trade)
         self.closed_trades.append(trade)
-        self.available_capital += trade.capital + trade.pnl
+        self.available_capital += trade.capital + trade.pnl + trade.order_commission
         self.trade_log.append(trade)
 
-        print(f"{trade.close_time} - {trade.symbol} - CLOSED TRADE - {trade.type} - ENTRY: ${trade.entry_price:.3f} - CLOSE: ${close_price:.3f} - PNL: ${trade.pnl:.2f} - SL: ${trade.sl_price:.3f} - TP: ${trade.tp_price:.3f} - REASON: {reason} - AVAILABLE CAPITAL: ${self.available_capital:.3f}")
+        print(f"{trade.symbol} - CLOSED TRADE    - {trade.type.upper()} - ENTRY: ${trade.entry_price:.3f} - CLOSE: ${close_price:.3f} - PNL: ${trade.pnl:.2f} - SL: ${trade.sl_price:.3f} - TP: ${trade.tp_price:.3f} - REASON: {reason} - AVAILABLE CAPITAL: ${self.available_capital:.3f}")
 
     def close_all_trades(self, last_timestamp: datetime):
         for trade in self.open_trades[:]:  # Create a copy of the list to iterate over

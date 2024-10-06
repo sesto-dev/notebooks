@@ -57,7 +57,7 @@ def performance(trades_df, initial_capital, main_timeframe, backtest_duration):
     avg_profit = trades_df.loc[trades_df['pnl'] > 0, 'pnl'].mean()
     avg_loss = trades_df.loc[trades_df['pnl'] < 0, 'pnl'].mean()
     avg_risk_reward_ratio = abs(avg_profit / avg_loss) if avg_loss != 0 else 0
-    total_fees = trades_df['position_size_usd'].sum() * 0.0002  # Assuming 0.02% total fees (transaction fee + slippage)
+    total_commissions = trades_df['order_commission'].sum()
 
     # New metrics
     first_trade_time = trades_df['entry_time'].min()
@@ -104,7 +104,7 @@ def performance(trades_df, initial_capital, main_timeframe, backtest_duration):
                   annualized_volatility * 100, sharpe_ratio, sortino_ratio, calmar_ratio, max_drawdown_dollar,
                   max_drawdown * 100, avg_drawdown_dollar, num_trades, win_rate * 100, best_trade, 
                   worst_trade, avg_trade, avg_risk_reward_ratio, max_trade_duration, avg_trade_duration, 
-                  total_fees, first_trade_time, last_trade_time, avg_time_between_trades, trades_per_day, 
+                  total_commissions, first_trade_time, last_trade_time, avg_time_between_trades, trades_per_day, 
                   trades_per_week, trades_per_month, trades_per_year, trades_left_open, trades_closed_by_tp, 
                   trades_closed_by_sl, trades_closed_by_liq, trades_closed_by_exit_condition, main_timeframe.name, str(backtest_duration),
                 num_long_trades, num_short_trades, f'{percent_long_trades:.2f}%', f'{percent_short_trades:.2f}%', f'{win_rate_long:.2f}%', f'{win_rate_short:.2f}%', f'${pnl_long:.2f}', f'${pnl_short:.2f}',]

@@ -1,19 +1,33 @@
 import MetaTrader5 as mt5
 from sesto.constants import CRYPTOCURRENCIES, OILS, METALS, CURRENCY_PAIRS
-def get_price_at_pnl(pnl_multiplier: float, order_commission: float, position_size_usd: float, leverage: float, entry_price: float, type: str) -> float:
-    required_movement = pnl_multiplier + (order_commission / position_size_usd)
-    price_movement = required_movement / leverage
 
+def get_price_at_pnl(desired_pnl: float, entry_price: float, position_size_usd: float, leverage: float, type: str, commission: float) -> tuple:
+    """
+    Calculate the price at which the desired PnL is achieved, with and without commission.
+
+    :param desired_pnl: The desired profit or loss in USD.
+    :param entry_price: The entry price of the trade.
+    :param position_size_usd: The size of the position in USD.
+    :param leverage: The leverage used for the trade.
+    :param type: The type of position, either 'long' or 'short'.
+    :param commission: The commission in USD.
+    :return: A tuple containing two prices:
+             - Price with commission
+             - Price without commission
+    :raises ValueError: If an unknown trade type is provided.
+    """
     if type == 'long':
-        target_price = entry_price * (1 + price_movement)
+        price_including_commission = entry_price * (1 + (desired_pnl + commission) / position_size_usd)
+        price_excluding_commission = entry_price * (1 + desired_pnl / position_size_usd)
     elif type == 'short':
-        target_price = entry_price * (1 - price_movement)
+        price_including_commission = entry_price * (1 - (desired_pnl + commission) / position_size_usd)
+        price_excluding_commission = entry_price * (1 - desired_pnl / position_size_usd)
     else:
         raise ValueError(f"Unknown trade type: {type}")
 
-    return target_price  # Ensure target_price is at least 1% of entry_price
+    return price_including_commission, price_excluding_commission
 
-def get_pnl_at_price(current_price: float, entry_price: float, position_size_usd: float, leverage: float, type: str) -> float:
+def get_pnl_at_price(current_price: float, entry_price: float, position_size_usd: float, leverage: float, type: str, commission: float) -> tuple:
     if type == 'long':
         price_change = (current_price - entry_price) / entry_price
     elif type == 'short':
@@ -21,9 +35,12 @@ def get_pnl_at_price(current_price: float, entry_price: float, position_size_usd
     else:
         raise ValueError(f"Unknown trade type: {type}")
     
-    # Calculate the PNL as a percentage of the position size
-    pnl = position_size_usd * price_change
-    return pnl
+    # Calculate gross PNL
+    pnl_including_commission = position_size_usd * price_change
+
+    # Subtract commissions
+    pnl_excluding_commission = pnl_including_commission - commission
+    return pnl_including_commission, pnl_excluding_commission
 
 def calculate_position_size(capital: float, leverage: float) -> float:
     return capital * leverage
@@ -41,18 +58,13 @@ def calculate_commission(position_size_usd: float, pair) -> float:
     elif pair in METALS:
         commission_rate = 0.0001 # 0.01%
     elif pair in CURRENCY_PAIRS:
-        commission_rate = 0.0005 # 0.05%
+        commission_rate = 0.00025 # 0.025%
+    else:
+        # Throw exception
+        raise ValueError(f"Could not calculate commission for unknown pair: {pair}")
 
     commission = position_size_usd * commission_rate # Total commission for both open and close
     return commission
-
-def calculate_break_even_price(entry_price: float, order_commission: float, position_size_usd: float, type: str) -> float:
-    if type == 'long':
-        return entry_price * (1 + (order_commission / position_size_usd))
-    elif type == 'short':
-        return entry_price * (1 - (order_commission / position_size_usd))
-    else:
-        raise ValueError(f"Unknown position type: {type}")
 
 def calculate_price_with_spread(price: float, spread_multiplier: float, increase: bool) -> float:
     if increase:

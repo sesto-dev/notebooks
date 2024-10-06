@@ -1,7 +1,8 @@
 import MetaTrader5 as mt5
 import pandas as pd
 from datetime import datetime, timedelta
-from sesto.constants import TIMEZONE
+from sesto.constants import TIMEZONE, TRADE_RETCODE_DESCRIPTION
+from sesto.telegram import TelegramSender
 
 # Initialize and connect to MetaTrader 5
 if not mt5.initialize():
@@ -50,10 +51,19 @@ def send_market_order(symbol, volume, order_type, sl=0.0, tp=0.0,
     order_result = mt5.order_send(request)
 
     if order_result is None:
-        print(f"Order failed, error code: {mt5.last_error()}")
+        error_code = mt5.last_error()
+        error_description = mt5.last_error_str()
+        print(f"Order failed, error code: {error_code}, description: {error_description}")
         return None
     elif order_result.retcode != mt5.TRADE_RETCODE_DONE:
+        Telegram = TelegramSender()
+
         print(f"Order failed, retcode: {order_result.retcode}")
+        print(f"Return code description: {TRADE_RETCODE_DESCRIPTION.get(order_result.retcode, 'Unknown')}")
+        print(f"Order request: {request}")
+        print(f"Order result: {order_result._asdict()}")
+
+        Telegram.send_json_message(order_result._asdict())
         return None
     
     print(f"Order successfully placed for {symbol}")
@@ -232,27 +242,29 @@ def get_deal_from_ticket(ticket, from_date=None, to_date=None):
     deals_df = pd.DataFrame([deal._asdict() for deal in deals])
 
     # Optional: Verify that all deals belong to the same symbol
-    if not all(deal['symbol'] == deals_df['symbol'].iloc[0] for deal in deals):
+    if not deals_df.empty and not all(deal == deals_df['symbol'].iloc[0] for deal in deals_df['symbol']):
         print(f"Inconsistent symbols found in deals for position ticket {ticket}.")
         return None
 
     # Extract relevant information
-    deal_details = {
-        'ticket': ticket,
-        'symbol': deals_df['symbol'].iloc[0],
-        'type': 'buy' if deals_df['type'].iloc[0] == mt5.DEAL_TYPE_BUY else 'sell',
-        'volume': deals_df['volume'].sum(),
-        'open_time': datetime.fromtimestamp(deals_df['time'].min(), tz=TIMEZONE),
-        'close_time': datetime.fromtimestamp(deals_df['time'].max(), tz=TIMEZONE),
-        'open_price': deals_df['price'].iloc[0],
-        'close_price': deals_df['price'].iloc[-1],
-        'profit': deals_df['profit'].sum(),
-        'commission': deals_df['commission'].sum(),
-        'swap': deals_df['swap'].sum(),
-        'comment': deals_df['comment'].iloc[-1]  # Use the last comment if multiple
-    }
-
-    return deal_details
+    if not deals_df.empty:
+        deal_details = {
+            'ticket': ticket,
+            'symbol': deals_df['symbol'].iloc[0],
+            'type': 'buy' if deals_df['type'].iloc[0] == mt5.DEAL_TYPE_BUY else 'sell',
+            'volume': deals_df['volume'].sum(),
+            'open_time': datetime.fromtimestamp(deals_df['time'].min(), tz=TIMEZONE),
+            'close_time': datetime.fromtimestamp(deals_df['time'].max(), tz=TIMEZONE),
+            'open_price': deals_df['price'].iloc[0],
+            'close_price': deals_df['price'].iloc[-1],
+            'profit': deals_df['profit'].sum(),
+            'commission': deals_df['commission'].sum(),
+            'swap': deals_df['swap'].sum(),
+            'comment': deals_df['comment'].iloc[-1]  # Use the last comment if multiple
+        }
+        return deal_details
+    else:
+        return None
 
 
 def get_order_from_ticket(ticket):
