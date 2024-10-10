@@ -54,11 +54,11 @@ def calculate_commission(position_size_usd: float, pair) -> float:
     if pair in CRYPTOCURRENCIES:
         commission_rate = 0.0005 # 0.05%
     elif pair in OILS:
-        commission_rate = 0.0001 # 0.01%
+        commission_rate = 0.00025
     elif pair in METALS:
-        commission_rate = 0.0001 # 0.01%
+        commission_rate = 0.00025
     elif pair in CURRENCY_PAIRS:
-        commission_rate = 0.00025 # 0.025%
+        commission_rate = 0.00025
     else:
         # Throw exception
         raise ValueError(f"Could not calculate commission for unknown pair: {pair}")

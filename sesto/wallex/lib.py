@@ -3,7 +3,6 @@ from typing import Dict, Any, Callable
 from .temp import WallexTempOrderBookData
 from .types import WallexOrderBookResponse, WallexTempMarketData
 from .config import WallexConfig
-from loguru import logger
 
 async def get_active_wallex_arbitrage_attempts_from_db(pool) -> list:
     async with pool.acquire() as conn:

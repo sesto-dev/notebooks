@@ -74,7 +74,8 @@ def performance(trades_df, initial_capital, main_timeframe, backtest_duration):
     trades_closed_by_liq = (trades_df['closing_reason'] == 'LIQ').sum()
     trades_closed_by_exit_condition = (trades_df['closing_reason'] == 'exit_condition').sum()
 
-    # New metrics
+    number_of_trades_with_triggered_trailing_stop = trades_df['triggered_trailing_stop'].sum()
+    percentage_of_trades_with_triggered_trailing_stop = (number_of_trades_with_triggered_trailing_stop / num_trades) * 100 if num_trades > 0 else 0
     num_long_trades = (trades_df['type'] == 'long').sum()
     num_short_trades = (trades_df['type'] == 'short').sum()
     percent_long_trades = (num_long_trades / num_trades) * 100 if num_trades > 0 else 0
@@ -94,21 +95,21 @@ def performance(trades_df, initial_capital, main_timeframe, backtest_duration):
                    'Worst Trade ($)', 'Avg. Trade ($)', 'Avg. Risk/Reward Ratio', 'Max. Trade Duration', 
                    'Avg. Trade Duration', 'Total Fees ($)', 'First Trade Time', 'Last Trade Time', 
                    'Avg. Time Between Trades', 'Trades per Day', 'Trades per Week', 'Trades per Month', 
-                   'Trades per Year', 'Trades Left Open', 'Trades closed by TP', 'Trades closed by SL', 'Trades closed by liquidation',
+                   'Trades per Year', 'Percentage of Trades with Triggered Trailing Stop', 'Trades Left Open', 'Trades closed by TP', 'Trades closed by SL', 'Trades closed by liquidation',
                     'Trades Closed by Exit Condition', 'Main Timeframe', 'Backtest Duration',
                     'Number of Long Trades', 'Number of Short Trades', 'Percentage of Long Trades', 'Percentage of Short Trades',
                     'Win Rate of Long Trades', 'Win Rate of Short Trades',
-                    'PnL of Long Trades', 'PnL of Short Trades',],
+                    'PnL of Long Trades', 'PnL of Short Trades'],
 
         'Value': [initial_capital, final_capital, total_profit, (final_capital / initial_capital - 1) * 100, annualized_return * 100,
                   annualized_volatility * 100, sharpe_ratio, sortino_ratio, calmar_ratio, max_drawdown_dollar,
                   max_drawdown * 100, avg_drawdown_dollar, num_trades, win_rate * 100, best_trade, 
                   worst_trade, avg_trade, avg_risk_reward_ratio, max_trade_duration, avg_trade_duration, 
                   total_commissions, first_trade_time, last_trade_time, avg_time_between_trades, trades_per_day, 
-                  trades_per_week, trades_per_month, trades_per_year, trades_left_open, trades_closed_by_tp, 
+                  trades_per_week, trades_per_month, trades_per_year, percentage_of_trades_with_triggered_trailing_stop, trades_left_open, trades_closed_by_tp, 
                   trades_closed_by_sl, trades_closed_by_liq, trades_closed_by_exit_condition, main_timeframe.name, str(backtest_duration),
-                num_long_trades, num_short_trades, f'{percent_long_trades:.2f}%', f'{percent_short_trades:.2f}%', f'{win_rate_long:.2f}%', f'{win_rate_short:.2f}%', f'${pnl_long:.2f}', f'${pnl_short:.2f}',]
-    })
+                num_long_trades, num_short_trades, f'{percent_long_trades:.2f}%', f'{percent_short_trades:.2f}%', f'{win_rate_long:.2f}%', f'{win_rate_short:.2f}%', f'${pnl_long:.2f}', f'${pnl_short:.2f}']
+            })
 
     # Apply formatting to the 'Value' column
     performance_summary['Value'] = performance_summary.apply(lambda row: 

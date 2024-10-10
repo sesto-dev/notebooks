@@ -57,13 +57,7 @@ def send_market_order(symbol, volume, order_type, sl=0.0, tp=0.0,
         return None
     elif order_result.retcode != mt5.TRADE_RETCODE_DONE:
         Telegram = TelegramSender()
-
-        print(f"Order failed, retcode: {order_result.retcode}")
-        print(f"Return code description: {TRADE_RETCODE_DESCRIPTION.get(order_result.retcode, 'Unknown')}")
-        print(f"Order request: {request}")
-        print(f"Order result: {order_result._asdict()}")
-
-        Telegram.send_json_message(order_result._asdict())
+        Telegram.send_json_message({"event": "error with sending order", "retcode": order_result.retcode, "description": TRADE_RETCODE_DESCRIPTION.get(order_result.retcode, 'Unknown'), "request": request})
         return None
     
     print(f"Order successfully placed for {symbol}")
