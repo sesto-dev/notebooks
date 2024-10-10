@@ -1,0 +1,99 @@
+services:
+  app-service:
+    build:
+      context: ../.. # This sets the build context to two directories up
+      dockerfile: apps/crypto/app/Dockerfile # Specify the path to your Dockerfile
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    environment:
+      - DATABASE_HOST=${DATABASE_HOST}
+      - DATABASE_PORT=${DATABASE_PORT}
+      - DATABASE_NAME=${DATABASE_NAME}
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
+      - NOBITEX_API_KEY_A=${NOBITEX_API_KEY_A}
+      - NOBITEX_API_KEY_H=${NOBITEX_API_KEY_H}
+    env_file:
+      - .env
+    depends_on:
+      - postgres-service
+    networks:
+      - app-network
+
+  postgres-service:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    ports:
+      - "${DATABASE_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  prometheus-service:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    ports:
+      - "${PROMETHEUS_PORT}:9090"
+    networks:
+      - app-network
+
+  grafana-service:
+    image: grafana/grafana
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus-service
+      - loki-service
+    networks:
+      - app-network
+
+  loki-service:
+    image: grafana/loki:2.9.10
+    volumes:
+      - ./loki:/etc/loki
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "${LOKI_PORT}:3100"
+    networks:
+      - app-network
+
+  promtail:
+    image: grafana/promtail
+    volumes:
+      - ./promtail:/etc/promtail
+      - /var/log:/var/log
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+
+networks:
+  app-network:
+    driver: bridge
