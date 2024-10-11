@@ -3,7 +3,7 @@ import pandas as pd
 import MetaTrader5 as mt5
 from datetime import datetime
 from typing import List, Dict
-from sesto.constants import MT5Timeframe
+from sesto.metatrader.constants import MT5Timeframe
 
 if not mt5.initialize():
     print(f"MetaTrader 5 initialization failed: {mt5.last_error()}")

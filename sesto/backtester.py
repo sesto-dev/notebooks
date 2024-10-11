@@ -4,7 +4,7 @@ from typing import List, Dict, Callable, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 from sesto.performance import performance
-from sesto.constants import MT5Timeframe
+from sesto.metatrader.constants import MT5Timeframe
 from sesto.utils import calculate_position_size, calculate_commission, get_price_at_pnl, calculate_price_with_spread, calculate_liquidation_price
 import time
 from datetime import timedelta

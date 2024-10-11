@@ -10,10 +10,11 @@ import MetaTrader5 as mt5
 import pandas as pd
 
 from sesto.fractal import high_low_finder
-from sesto.utils import get_price_at_pnl, calculate_commission, calculate_position_size, get_pnl_at_price, convert_lots_to_usd, calculate_trade_volume, convert_usd_to_lots
+from sesto.metatrader.utils import calculate_commission, convert_lots_to_usd, convert_usd_to_lots
+from sesto.utils import get_price_at_pnl, calculate_position_size, get_pnl_at_price, calculate_trade_volume, convert_usd_to_lots
 from sesto.metatrader.business import get_positions, send_market_order, modify_sl_tp, get_order_from_ticket, get_deal_from_ticket
 from sesto.metatrader.data import fetch_data_pos
-from sesto.constants import CRYPTOCURRENCIES, CURRENCY_PAIRS, METALS, OILS, TIMEZONE, MT5Timeframe
+from sesto.metatrader.constants import CRYPTOCURRENCIES, CURRENCY_PAIRS, METALS, OILS, TIMEZONE, MT5Timeframe
 from sesto.telegram import TelegramSender
 
 Telegram = TelegramSender()

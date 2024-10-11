@@ -1,7 +1,7 @@
 import MetaTrader5 as mt5
 import pandas as pd
 from datetime import datetime, timedelta
-from sesto.constants import TIMEZONE, TRADE_RETCODE_DESCRIPTION
+from sesto.metatrader.constants import TIMEZONE, TRADE_RETCODE_DESCRIPTION
 from sesto.telegram import TelegramSender
 
 # Initialize and connect to MetaTrader 5

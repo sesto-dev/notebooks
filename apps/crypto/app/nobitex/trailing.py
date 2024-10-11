@@ -12,7 +12,8 @@ from sesto.nobitex.client import NobitexClient
 from sesto.nobitex.endpoints import NobitexEndpoints
 from sesto.telegram import TelegramSender
 
-from sesto.utils import convert_lots_to_usd, calculate_position_size, calculate_commission, get_pnl_at_price, get_price_at_pnl
+from sesto.utils import calculate_position_size, get_pnl_at_price, get_price_at_pnl
+from sesto.nobitex.utils import calculate_nobitex_commission
 load_dotenv()
 
 TRAILING_STOP_STEPS = [
@@ -63,7 +64,7 @@ def run_strategy_for_client(client):
             collateral = float(position['collateral'])
             unrealized_pnl = float(position['unrealizedPNL'])
             trade_size = calculate_position_size(collateral, leverage)
-            fee = calculate_commission(position_size_usd=trade_size) 
+            fee = calculate_nobitex_commission(position_size_usd=trade_size) 
             
             current_pnl_percentage = (unrealized_pnl / collateral) * 100
             print(f"{created_at} - {symbol} - PNL INFO - PNL: ${unrealized_pnl:.3f} or {current_pnl_percentage:.3f}%")

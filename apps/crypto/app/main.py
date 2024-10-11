@@ -11,8 +11,6 @@ from nobitex.trailing import run_strategy_for_clients  # Import the function tha
 
 # Import database operations
 from database import store_trade, update_trade
-from sesto.constants import TIMEZONE
-
 
 # Simple HTTP server
 class SimpleServer(SimpleHTTPRequestHandler):
@@ -54,6 +52,6 @@ if __name__ == "__main__":
             time.sleep(1)
 
     except KeyboardInterrupt:
-        print(f"{datetime.now(tz=TIMEZONE)} - Program terminated by user.")
+        print(f"{datetime.now()} - Program terminated by user.")
     except Exception as e:
-        print(f"{datetime.now(tz=TIMEZONE)} - Unhandled exception: {e}")
+        print(f"{datetime.now()} - Unhandled exception: {e}")

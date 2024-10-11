@@ -24,3 +24,7 @@ def get_best_order_blocks(order_book: Dict[str, List[Dict]]):
     ask_price = min(order_book['ask'], key=lambda x: x['price'])
     bid_price = max(order_book['bid'], key=lambda x: x['price'])
     return {"ask_price": ask_price, "bid_price": bid_price}
+
+def calculate_nobitex_commission(position_size_usd: float) -> float:
+    commission = position_size_usd * 0.00025
+    return commission
