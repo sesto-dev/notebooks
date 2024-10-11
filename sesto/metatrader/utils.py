@@ -1,5 +1,5 @@
 import MetaTrader5 as mt5
-from sesto.metatrader.constants import CRYPTOCURRENCIES, OILS, METALS, CURRENCY_PAIRS
+from sesto.constants import CRYPTOCURRENCIES, OILS, METALS, CURRENCY_PAIRS
 
 def convert_lots_to_usd(symbol, lots, price_open):
     """

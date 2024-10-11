@@ -20,8 +20,14 @@ services:
     depends_on:
       postgres-service:
         condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.crypto-app.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.crypto-app.entrypoints=websecure"
+      - "traefik.http.routers.crypto-app.tls.certresolver=myresolver"
     networks:
-      - app-network
+      - crypto-internal
+      - traefik-public
 
   postgres-service:
     image: postgres:13
@@ -34,7 +40,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - app-network
+      - crypto-internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
       interval: 10s
@@ -54,9 +60,14 @@ services:
       - "--web.console.templates=/usr/share/prometheus/consoles"
     ports:
       - "${PROMETHEUS_PORT}:9090"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.crypto-prometheus.rule=Host(`prometheus.${DOMAIN}`)"
+      - "traefik.http.routers.crypto-prometheus.entrypoints=websecure"
+      - "traefik.http.routers.crypto-prometheus.tls.certresolver=myresolver"
     networks:
-      - app-network
-
+      - crypto-internal
+      - traefik-public
   grafana-service:
     image: grafana/grafana
     ports:
@@ -66,8 +77,14 @@ services:
     depends_on:
       - prometheus-service
       - loki-service
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.crypto-grafana.rule=Host(`grafana.${DOMAIN}`)"
+      - "traefik.http.routers.crypto-grafana.entrypoints=websecure"
+      - "traefik.http.routers.crypto-grafana.tls.certresolver=myresolver"
     networks:
-      - app-network
+      - crypto-internal
+      - traefik-public
 
   loki-service:
     image: grafana/loki:2.9.10
@@ -77,42 +94,33 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     ports:
       - "${LOKI_PORT}:3100"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.crypto-loki.rule=Host(`loki.${DOMAIN}`)"
+      - "traefik.http.routers.crypto-loki.entrypoints=websecure"
+      - "traefik.http.routers.crypto-loki.tls.certresolver=myresolver"
     networks:
-      - app-network
-
+      - crypto-internal
+      - traefik-public
   promtail:
     image: grafana/promtail
     volumes:
       - ./promtail:/etc/promtail
       - /var/log:/var/log
     command: -config.file=/etc/promtail/config.yml
+    labels:
+      - "traefik.enable=false"
     networks:
-      - app-network
-
-  caddy:
-    image: caddy:2
-    ports:
-      - "${CADDY_PORT}:80"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - app-network
-    depends_on:
-      - app-service
-      - grafana-service
-      - prometheus-service
-      - loki-service
+      - crypto-internal
 
 volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
   loki_data:
-  caddy_data:
-  caddy_config:
 
 networks:
-  app-network:
+  crypto-internal:
     driver: bridge
+  traefik-public:
+    external: true

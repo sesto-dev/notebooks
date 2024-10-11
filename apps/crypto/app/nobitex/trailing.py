@@ -16,6 +16,9 @@ from sesto.utils import calculate_position_size, get_pnl_at_price, get_price_at_
 from sesto.nobitex.utils import calculate_nobitex_commission
 load_dotenv()
 
+Telegram = TelegramSender()
+Telegram.send_message("TRAILING STOP ALGORITHM IS ONLINE.")
+
 TRAILING_STOP_STEPS = [
     {'trigger_pnl_multiplier': 4.00, 'new_sl_pnl_multiplier': 3.50},
     {'trigger_pnl_multiplier': 3.50, 'new_sl_pnl_multiplier': 3.00},
@@ -117,60 +120,29 @@ def run_strategy_for_client(client):
                 if unrealized_pnl >= pnl_threshold:
                     old_sl_price = float(sl_order['price']) if sl_order else None
 
-                    if position['side'] == 'buy':  # Long
-                        new_sl_price = get_price_at_pnl(
-                            pnl_multiplier=new_sl_pnl_multiplier,
-                            order_fee=fee,
-                            position_size_usd=collateral,
-                            leverage=leverage,
-                            entry_price=entryPrice,
-                            type='long'
-                        )
-                        new_tp_price = get_price_at_pnl(
-                            pnl_multiplier=leverage * 0.7,
-                            order_fee=fee,
-                            position_size_usd=collateral,
-                            leverage=leverage,
-                            entry_price=entryPrice,
-                            type='long'
-                        )
-                        if old_sl_price is None or new_sl_price > old_sl_price:
-                            print(f'{created_at} - TRIGGERED TRAILING STOP - {position.symbol} - NEW SL: ${new_sl_price:.3f}')
-                            client.cancel_all_orders(trade_type='margin', src_currency=position['srcCurrency'], dst_currency=position['dstCurrency'])
-                            oco = client.modify_sl_tp(position['id'], 'oco', position['liability'], new_tp_price, new_sl_price, new_sl_price)
-                            print(oco)
-                    else:  # Short
-                        new_sl_price = get_price_at_pnl(
-                            pnl_multiplier=new_sl_pnl_multiplier,
-                            order_fee=fee,
-                            position_size_usd=collateral,
-                            leverage=leverage,
-                            entry_price=entryPrice,
-                            type='short'
-                        )
-                        new_sl_price = get_price_at_pnl(
-                            pnl_multiplier=new_sl_pnl_multiplier,
-                            order_fee=fee,
-                            position_size_usd=collateral,
-                            leverage=leverage,
-                            entry_price=entryPrice,
-                            type='short'
-                        )
-                        new_tp_price = get_price_at_pnl(
-                            pnl_multiplier=leverage * 0.7,
-                            order_fee=fee,
-                            position_size_usd=collateral,
-                            leverage=leverage,
-                            entry_price=entryPrice,
-                            type='short'
-                        )
-
-                        print(f'{created_at} - TRIGGERED TRAILING STOP - {symbol} - ENTRY_PRICE: {entryPrice} NEW SL: ${new_sl_price:.3f} - NEW TP: ${new_tp_price:.3f}')
-                        if old_sl_price is None or new_sl_price < old_sl_price:
-                            print(f'{created_at} - TRIGGERED TRAILING STOP - {symbol} - NEW SL: ${new_sl_price:.3f}')
-                            client.cancel_all_orders(trade_type='margin', src_currency=position['srcCurrency'], dst_currency=position['dstCurrency'])
-                            oco = client.modify_sl_tp(position['id'], 'oco', position['liability'], 2, new_sl_price, new_sl_price)
-                            print(oco)
+                    new_sl_price = get_price_at_pnl(
+                        pnl_multiplier=new_sl_pnl_multiplier,
+                        order_fee=fee,
+                        position_size_usd=collateral,
+                        leverage=leverage,
+                        entry_price=entryPrice,
+                        type='long' if position['side'] == 'buy' else 'short'
+                    )
+                    new_tp_price = get_price_at_pnl(
+                        pnl_multiplier=leverage * 0.7,
+                        order_fee=fee,
+                        position_size_usd=collateral,
+                        leverage=leverage,
+                        entry_price=entryPrice,
+                        type='long' if position['side'] == 'buy' else 'short'
+                    )
+                    
+                    if old_sl_price is None or (position['side'] == 'buy' and new_sl_price > old_sl_price) or (position['side'] == 'sell' and new_sl_price < old_sl_price):
+                        print(f'{created_at} - TRIGGERED TRAILING STOP - {position.symbol} - NEW SL: ${new_sl_price:.3f}')
+                        client.cancel_all_orders(trade_type='margin', src_currency=position['srcCurrency'], dst_currency=position['dstCurrency'])
+                        oco = client.modify_sl_tp(position['id'], 'oco', position['liability'], new_tp_price, new_sl_price, new_sl_price)
+                        print(oco)
+                        Telegram.send_json_message(oco)
                     
                     break
             sleep(10)
