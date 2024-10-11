@@ -1,21 +1,21 @@
 :80 {
-    handle /app/* {
-        uri strip_prefix /app
-        reverse_proxy app-service:${APP_PORT}
-    }
+	handle /app/* {
+		uri strip_prefix /app
+		reverse_proxy app-service:${APP_PORT}
+	}
 
-    handle /grafana/* {
-        uri strip_prefix /grafana
-        reverse_proxy grafana-service:3000
-    }
+	handle /grafana/* {
+		uri strip_prefix /grafana
+		reverse_proxy grafana-service:3000
+	}
 
-    handle /prometheus/* {
-        uri strip_prefix /prometheus
-        reverse_proxy prometheus-service:9090
-    }
+	handle /prometheus/* {
+		uri strip_prefix /prometheus
+		reverse_proxy prometheus-service:9090
+	}
 
-    handle /loki/* {
-        uri strip_prefix /loki
-        reverse_proxy loki-service:3100
-    }
+	handle /loki/* {
+		uri strip_prefix /loki
+		reverse_proxy loki-service:3100
+	}
 }
