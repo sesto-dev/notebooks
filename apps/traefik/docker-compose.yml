@@ -3,20 +3,37 @@ services:
     image: traefik:v2.9
     command:
       - "--api=true"
+      - "--api.dashboard=true"
       - "--providers.docker=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-      - "--certificatesresolvers.myresolver.acme.email=your-email@example.com"
+      - "--certificatesresolvers.myresolver.acme.email=sesto@post.com"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "--log.level=DEBUG" # Increase log verbosity
+      - "--accesslog=true" # Enable access logs
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--log.filepath=/var/log/traefik/traefik.log"
     ports:
       - "80:80"
       - "443:443"
+      - "8080:8080" # Expose the dashboard port
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./letsencrypt:/letsencrypt"
+      - "./logs:/var/log/traefik" # Mount a volume for logs
     networks:
       - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls.certresolver=myresolver"
+      - "traefik.http.routers.dashboard.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=${DASHBOARD_AUTH}"
+    environment:
+      - DASHBOARD_AUTH=${DASHBOARD_AUTH}
 
 networks:
   traefik-public:
