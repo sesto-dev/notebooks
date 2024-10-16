@@ -20,12 +20,19 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.crypto-app.tls=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.constraint-label=traefik-public"
+
+      - "traefik.http.services.crypto-app.loadbalancer.server.port=3000"
+
       - "traefik.http.routers.crypto-app.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.crypto-app.entrypoints=websecure"
-      - "traefik.http.routers.crypto-app.tls.certresolver=myresolver"
+      - "traefik.http.routers.crypto-app.tls=true"
+      - "traefik.http.routers.crypto-app.entrypoints=https"
+      - "traefik.http.routers.crypto-app.tls.certresolver=le"
+
+      - "traefik.http.routers.crypto-app-http.middlewares=https-redirect"
     networks:
-      - crypto-internal
+      - default
       - traefik-public
 
   postgres-service:
@@ -38,8 +45,6 @@ services:
       - "${DATABASE_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - crypto-internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
       interval: 10s
@@ -64,7 +69,7 @@ services:
       - "traefik.http.routers.crypto-prometheus.entrypoints=websecure"
       - "traefik.http.routers.crypto-prometheus.tls.certresolver=myresolver"
     networks:
-      - crypto-internal
+      - default
       - traefik-public
 
   grafana-service:
@@ -76,12 +81,21 @@ services:
       - loki-service
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.crypto-grafana.tls=true"
+      - traefik.docker.network=traefik-public
+      - traefik.constraint-label=traefik-public
+
+      - traefik.http.routers.crypto-grafana-http.rule=Host(`grafana.${DOMAIN}`)
+      - traefik.http.routers.crypto-grafana-http.entrypoints=http
+
       - "traefik.http.routers.crypto-grafana.rule=Host(`grafana.${DOMAIN}`)"
-      - "traefik.http.routers.crypto-grafana.entrypoints=websecure"
-      - "traefik.http.routers.crypto-grafana.tls.certresolver=myresolver"
+      - "traefik.http.routers.crypto-grafana.entrypoints=https"
+
+      - "traefik.http.routers.crypto-grafana.tls=true"
+      - "traefik.http.routers.crypto-grafana.tls.certresolver=le"
+
+      - traefik.http.routers.crypto-grafana-http.middlewares=https-redirect
     networks:
-      - crypto-internal
+      - default
       - traefik-public
 
   loki-service:
@@ -97,7 +111,7 @@ services:
       - "traefik.http.routers.crypto-loki.entrypoints=websecure"
       - "traefik.http.routers.crypto-loki.tls.certresolver=myresolver"
     networks:
-      - crypto-internal
+      - default
       - traefik-public
   promtail:
     image: grafana/promtail
@@ -108,7 +122,7 @@ services:
     labels:
       - "traefik.enable=false"
     networks:
-      - crypto-internal
+      - default
 
 volumes:
   postgres_data:
@@ -117,7 +131,5 @@ volumes:
   loki_data:
 
 networks:
-  crypto-internal:
-    driver: bridge
   traefik-public:
     external: true

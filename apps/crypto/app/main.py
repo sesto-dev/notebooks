@@ -6,11 +6,13 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 import os
 import logging
 
-# Import your algorithm
 from nobitex.trailing import run_strategy_for_clients  # Import the function that sets up the ThreadPoolExecutor
 
-# Import database operations
 from database import store_trade, update_trade
+
+from sesto.telegram import TelegramSender
+
+Telegram = TelegramSender()
 
 # Simple HTTP server
 class SimpleServer(SimpleHTTPRequestHandler):
@@ -47,6 +49,7 @@ if __name__ == "__main__":
         trailing_stop_thread.start()
 
         logger.info(f"Threads started successfully.")
+        Telegram.send_message("Threads started successfully.")
 
         while True:
             time.sleep(1)
