@@ -3,16 +3,6 @@ services:
     build:
       context: ../.. # This sets the build context to two directories up
       dockerfile: apps/crypto/app/Dockerfile # Specify the path to your Dockerfile
-    environment:
-      - DATABASE_HOST=${DATABASE_HOST}
-      - DATABASE_PORT=${DATABASE_PORT}
-      - DATABASE_NAME=${DATABASE_NAME}
-      - DATABASE_USER=${DATABASE_USER}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
-      - NOBITEX_API_KEY_A=${NOBITEX_API_KEY_A}
-      - NOBITEX_API_KEY_H=${NOBITEX_API_KEY_H}
     env_file:
       - .env
     depends_on:
@@ -21,11 +11,10 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik-public"
-      - "traefik.constraint-label=traefik-public"
 
-      - "traefik.http.services.crypto-app.loadbalancer.server.port=3000"
+      - "traefik.http.services.crypto-app.loadbalancer.server.port=${APP_CRYPTO_PORT}"
 
-      - "traefik.http.routers.crypto-app.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.crypto-app.rule=Host(`${APP_CRYPTO_DOMAIN}`)"
       - "traefik.http.routers.crypto-app.tls=true"
       - "traefik.http.routers.crypto-app.entrypoints=https"
       - "traefik.http.routers.crypto-app.tls.certresolver=le"
@@ -35,101 +24,8 @@ services:
       - default
       - traefik-public
 
-  postgres-service:
-    image: postgres:13
-    environment:
-      POSTGRES_DB: ${DATABASE_NAME}
-      POSTGRES_USER: ${DATABASE_USER}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-    ports:
-      - "${DATABASE_PORT}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  prometheus-service:
-    image: prom/prometheus
-    volumes:
-      - ./prometheus:/etc/prometheus
-      - prometheus_data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
-      - "--web.console.templates=/usr/share/prometheus/consoles"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.crypto-prometheus.tls=true"
-      - "traefik.http.routers.crypto-prometheus.rule=Host(`prometheus.${DOMAIN}`)"
-      - "traefik.http.routers.crypto-prometheus.entrypoints=websecure"
-      - "traefik.http.routers.crypto-prometheus.tls.certresolver=myresolver"
-    networks:
-      - default
-      - traefik-public
-
-  grafana-service:
-    image: grafana/grafana
-    volumes:
-      - grafana_data:/var/lib/grafana
-    depends_on:
-      - prometheus-service
-      - loki-service
-    labels:
-      - "traefik.enable=true"
-      - traefik.docker.network=traefik-public
-      - traefik.constraint-label=traefik-public
-
-      - traefik.http.routers.crypto-grafana-http.rule=Host(`grafana.${DOMAIN}`)
-      - traefik.http.routers.crypto-grafana-http.entrypoints=http
-
-      - "traefik.http.routers.crypto-grafana.rule=Host(`grafana.${DOMAIN}`)"
-      - "traefik.http.routers.crypto-grafana.entrypoints=https"
-
-      - "traefik.http.routers.crypto-grafana.tls=true"
-      - "traefik.http.routers.crypto-grafana.tls.certresolver=le"
-
-      - traefik.http.routers.crypto-grafana-http.middlewares=https-redirect
-    networks:
-      - default
-      - traefik-public
-
-  loki-service:
-    image: grafana/loki:2.9.10
-    volumes:
-      - ./loki:/etc/loki
-      - loki_data:/loki
-    command: -config.file=/etc/loki/local-config.yaml
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.crypto-loki.tls=true"
-      - "traefik.http.routers.crypto-loki.rule=Host(`loki.${DOMAIN}`)"
-      - "traefik.http.routers.crypto-loki.entrypoints=websecure"
-      - "traefik.http.routers.crypto-loki.tls.certresolver=myresolver"
-    networks:
-      - default
-      - traefik-public
-  promtail:
-    image: grafana/promtail
-    volumes:
-      - ./promtail:/etc/promtail
-      - /var/log:/var/log
-    command: -config.file=/etc/promtail/config.yml
-    labels:
-      - "traefik.enable=false"
-    networks:
-      - default
-
-volumes:
-  postgres_data:
-  prometheus_data:
-  grafana_data:
-  loki_data:
-
 networks:
+  default:
+    driver: bridge
   traefik-public:
     external: true

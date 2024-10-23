@@ -21,7 +21,7 @@ class SimpleServer(SimpleHTTPRequestHandler):
         self.wfile.write(b"MetaTrader5 Python Server is running")
 
 def run_server():
-    httpd = HTTPServer(('0.0.0.0', 3000), SimpleServer)
+    httpd = HTTPServer(('0.0.0.0', 1111), SimpleServer)
     httpd.serve_forever()
 
     # Configure logging

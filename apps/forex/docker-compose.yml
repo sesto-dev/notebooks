@@ -3,97 +3,31 @@ services:
     build:
       context: ../.. # This sets the build context to two directories up
       dockerfile: apps/forex/app/Dockerfile # Specify the path to your Dockerfile
-    ports:
-      - "${APP_PORT}:${APP_PORT}"
-    environment:
-      - DATABASE_HOST=${DATABASE_HOST}
-      - DATABASE_PORT=${DATABASE_PORT}
-      - DATABASE_NAME=${DATABASE_NAME}
-      - DATABASE_USER=${DATABASE_USER}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - MT5_LOGIN=${MT5_LOGIN}
-      - MT5_PASSWORD=${MT5_PASSWORD}
-      - MT5_SERVER=${MT5_SERVER}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
-      - NOBITEX_API_KEY_A=${NOBITEX_API_KEY_A}
-      - NOBITEX_API_KEY_H=${NOBITEX_API_KEY_H}
+    labels:
+      # Enable Traefik for this service
+      - "traefik.enable=true"
+
+      - traefik.http.routers.app-forex-http.rule=Host(`${APP_FOREX_DOMAIN}`)
+      - traefik.http.routers.app-forex-http.entrypoints=http
+      - traefik.http.routers.app-forex-http.middlewares=https-redirect
+
+      - traefik.http.routers.app-forex-https.rule=Host(`${APP_FOREX_DOMAIN}`)
+      - traefik.http.routers.app-forex-https.entrypoints=https
+      - traefik.http.routers.app-forex-https.tls=true
+      - traefik.http.routers.app-forex-https.tls.certresolver=le
+      - traefik.http.routers.app-forex-https.service=app-forex-service
+
+      - traefik.http.services.app-forex-service.loadbalancer.server.port=${APP_FOREX_PORT}
     env_file:
       - .env
     depends_on:
       - postgres-service
     networks:
-      - app-network
-
-  postgres-service:
-    image: postgres:13
-    environment:
-      POSTGRES_DB: ${DATABASE_NAME}
-      POSTGRES_USER: ${DATABASE_USER}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-    ports:
-      - "${DATABASE_PORT}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  prometheus-service:
-    image: prom/prometheus
-    volumes:
-      - ./prometheus:/etc/prometheus
-      - prometheus_data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
-      - "--web.console.templates=/usr/share/prometheus/consoles"
-    ports:
-      - "${PROMETHEUS_PORT}:9090"
-    networks:
-      - app-network
-
-  grafana-service:
-    image: grafana/grafana
-    ports:
-      - "${GRAFANA_PORT}:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-    depends_on:
-      - prometheus-service
-    networks:
-      - app-network
-
-  loki-service:
-    image: grafana/loki
-    ports:
-      - "${LOKI_PORT}:3100"
-    command: -config.file=/etc/loki/local-config.yaml
-    volumes:
-      - ./loki:/etc/loki
-    networks:
-      - app-network
-
-  promtail:
-    image: grafana/promtail
-    volumes:
-      - ./promtail:/etc/promtail
-      - /var/log:/var/log
-    command: -config.file=/etc/promtail/config.yml
-    networks:
-      - app-network
-
-volumes:
-  postgres_data:
-  prometheus_data:
-  grafana_data:
+      - default
+      - traefik-public
 
 networks:
-  app-network:
+  default:
     driver: bridge
+  traefik-public:
+    external: true
