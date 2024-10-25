@@ -1,51 +1,22 @@
-import sys
-sys.path.append("../../..")
-
-import time
+import logging
 from time import sleep
 from datetime import datetime, timedelta
-import threading
-
-import MetaTrader5 as mt5
 import pandas as pd
 
-from sesto.fractal import high_low_finder
-from sesto.metatrader.utils import calculate_commission, convert_lots_to_usd, convert_usd_to_lots
-from sesto.utils import get_price_at_pnl, calculate_position_size, get_pnl_at_price, calculate_trade_volume, convert_usd_to_lots
-from sesto.metatrader.business import get_positions, send_market_order, modify_sl_tp, get_order_from_ticket, get_deal_from_ticket
-from sesto.metatrader.data import fetch_data_pos
-from sesto.metatrader.constants import CRYPTOCURRENCIES, CURRENCY_PAIRS, METALS, OILS, TIMEZONE, MT5Timeframe
-from sesto.telegram import TelegramSender
+from utils import calculate_commission, convert_lots_to_usd, convert_usd_to_lots
+from constants import CRYPTOCURRENCIES, TIMEZONE, MT5Timeframe
+from config import TRAILING_STOP_STEPS, PAIRS, MAIN_TIMEFRAME, TP_PNL_MULTIPLIER, SL_PNL_MULTIPLIER, LEVERAGE, DEVIATION, VOLUME
+
+from algorithms.utils import get_price_at_pnl, calculate_position_size, get_pnl_at_price, calculate_trade_volume
+from algorithms.fractal import fractal
+from library.telegram import TelegramSender
+
+from api.business import get_positions, send_market_order, modify_sl_tp, get_order_from_ticket, get_deal_from_ticket
+from api.data import symbol_info_tick, symbol_info, fetch_data_pos
+
+logger = logging.getLogger(__name__)
 
 Telegram = TelegramSender()
-PAIRS = ['NG', 'BRN', 'WTI', 'XAGUSD']
-MAIN_TIMEFRAME = MT5Timeframe.M15
-
-TP_PNL_MULTIPLIER = 0.5
-SL_PNL_MULTIPLIER = -0.33
-LEVERAGE = 500
-DEVIATION = 20
-VOLUME = 0.1
-CAPITAL_PER_TRADE = 100
-
-TRAILING_STOP_STEPS = [
-    {'trigger_pnl_multiplier': 4.00, 'new_sl_pnl_multiplier': 3.50},
-    {'trigger_pnl_multiplier': 3.50, 'new_sl_pnl_multiplier': 3.00},
-    {'trigger_pnl_multiplier': 3.00, 'new_sl_pnl_multiplier': 2.75},
-    {'trigger_pnl_multiplier': 2.75, 'new_sl_pnl_multiplier': 2.50},
-    {'trigger_pnl_multiplier': 2.50, 'new_sl_pnl_multiplier': 2.25},
-    {'trigger_pnl_multiplier': 2.25, 'new_sl_pnl_multiplier': 2.00},
-    {'trigger_pnl_multiplier': 2.00, 'new_sl_pnl_multiplier': 1.75},
-    {'trigger_pnl_multiplier': 1.75, 'new_sl_pnl_multiplier': 1.50},
-    {'trigger_pnl_multiplier': 1.50, 'new_sl_pnl_multiplier': 1.25},
-    {'trigger_pnl_multiplier': 1.25, 'new_sl_pnl_multiplier': 1.00},
-    {'trigger_pnl_multiplier': 1.00, 'new_sl_pnl_multiplier': 0.75},
-    {'trigger_pnl_multiplier': 0.75, 'new_sl_pnl_multiplier': 0.45},
-    {'trigger_pnl_multiplier': 0.50, 'new_sl_pnl_multiplier': 0.22},
-    {'trigger_pnl_multiplier': 0.25, 'new_sl_pnl_multiplier': 0.12},
-    {'trigger_pnl_multiplier': 0.12, 'new_sl_pnl_multiplier': 0.05},
-    {'trigger_pnl_multiplier': 0.06, 'new_sl_pnl_multiplier': 0.025},
-]
 
 def calculate_position_capital(symbol, volume_lots, leverage, price_open):
     position_size_usd = convert_lots_to_usd(symbol, volume_lots, price_open)
@@ -55,6 +26,24 @@ def calculate_position_capital(symbol, volume_lots, leverage, price_open):
 def have_open_positions_in_symbol(symbol):
     positions = get_positions()
     return symbol in positions['symbol'].values
+
+def market_is_open(symbol):
+    if symbol not in CRYPTOCURRENCIES:
+        return True
+    else:
+    # Check whether the market is open, if its a crypto then market doesn't close
+        tick = symbol_info_tick(symbol)
+        if tick is not None:
+            tick_time = datetime.fromtimestamp(tick.time, tz=TIMEZONE)
+            current_time = datetime.now(TIMEZONE)
+            time_difference = current_time - tick_time
+
+            if time_difference > timedelta(minutes=5):
+                return False
+            else:
+                return True
+        else:
+            return False
 
 # dict to store trades, keys are position tickets, values are the entire position object
 trades = {}
@@ -69,28 +58,17 @@ def check_entry_condition():
                 if have_open_positions_in_symbol(pair):
                     continue
 
-                if pair not in CRYPTOCURRENCIES:
-                    # Check whether the market is open
-                    tick = mt5.symbol_info_tick(pair)
-                    if tick is not None:
-                        tick_time = datetime.fromtimestamp(tick.time, tz=TIMEZONE)
-                        current_time = datetime.now(TIMEZONE)
-                        time_difference = current_time - tick_time
-
-                        if time_difference > timedelta(minutes=5):
-                            continue
-                    else:
-                        continue
+                if not market_is_open(pair):
+                    continue
 
                 df = fetch_data_pos(pair, MAIN_TIMEFRAME, 50)
                 if df is None or df.empty:
                     print(f"No data fetched for {pair}. Skipping...")
                     continue
 
-                df['fractal'] = high_low_finder(df)
-                df['symbol'] = pair
+                df['fractal'] = fractal(df)
 
-                last_tick_price = mt5.symbol_info_tick(pair).ask
+                last_tick_price = symbol_info_tick(pair).ask
                 if last_tick_price is None:
                     print(f"Failed to retrieve ask price for {pair}.")
                     continue
@@ -119,7 +97,7 @@ def check_entry_condition():
                         order_type='sell' if last_row['fractal'] == 'top' else 'buy',
                         sl=sl_including_commission,
                         deviation=DEVIATION,
-                        type_filling=mt5.ORDER_FILLING_FOK
+                        type_filling='ORDER_FILLING_FOK'
                     )
 
                     if order is not None:
@@ -155,8 +133,10 @@ def check_entry_condition():
                                 'pnl_at_sl_excluding_commission': f"${get_pnl_at_price(sl_excluding_commission, last_tick_price, position_size, LEVERAGE, 'long' if last_row['fractal'] == 'bottom' else 'short', commission)[1]:.5f}",
                             },
                         }
+
+                        
                         Telegram.send_json_message(trade_info)
-                        print(f"Order placed successfully for {pair}: {trade_info}")
+                        logger.info(f"Order placed successfully for {pair}: {trade_info}")
                     else:
                         trade_info = {
                             'event': 'trade_failed_to_open',

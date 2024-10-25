@@ -1,5 +1,3 @@
-
-
 def get_price_at_pnl(desired_pnl: float, entry_price: float, position_size_usd: float, leverage: float, type: str, commission: float) -> tuple:
     """
     Calculate the price at which the desired PnL is achieved, with and without commission.

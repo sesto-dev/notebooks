@@ -1,8 +1,7 @@
 services:
   app-service:
     build:
-      context: ../.. # This sets the build context to two directories up
-      dockerfile: apps/forex/app/Dockerfile # Specify the path to your Dockerfile
+      dockerfile: app/Dockerfile # Specify the path to your Dockerfile
     labels:
       # Enable Traefik for this service
       - "traefik.enable=true"
@@ -20,14 +19,9 @@ services:
       - traefik.http.services.app-forex-service.loadbalancer.server.port=${APP_FOREX_PORT}
     env_file:
       - .env
-    depends_on:
-      - postgres-service
     networks:
-      - default
       - traefik-public
 
 networks:
-  default:
-    driver: bridge
   traefik-public:
     external: true

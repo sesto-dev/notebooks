@@ -1,6 +1,6 @@
 import pandas as pd
 
-def high_low_finder(data):
+def fractal(data):
     current_leg = False
     determination_candle = False
     hl_situation = False
