@@ -5,7 +5,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from sesto.performance import performance
 from sesto.metatrader.constants import MT5Timeframe
-from sesto.utils import calculate_position_size, calculate_commission, get_price_at_pnl, calculate_price_with_spread, calculate_liquidation_price
+from sesto.utils import calculate_position_size, get_price_at_pnl, calculate_price_with_spread, calculate_liquidation_price
+from sesto.metatrader.utils import calculate_commission
 import time
 from datetime import timedelta
 from IPython.display import display

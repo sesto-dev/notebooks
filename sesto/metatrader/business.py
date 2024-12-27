@@ -42,8 +42,6 @@ def send_market_order(symbol, volume, order_type, sl=0.0, tp=0.0,
         "sl": sl,
         "tp": tp,
         "deviation": deviation,
-        "magic": magic,
-        "comment": comment,
         "type_time": mt5.ORDER_TIME_GTC,
         "type_filling": type_filling,
     }

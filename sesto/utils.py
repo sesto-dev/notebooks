@@ -42,8 +42,6 @@ def get_pnl_at_price(current_price: float, entry_price: float, position_size_usd
 def calculate_position_size(capital: float, leverage: float) -> float:
     return capital * leverage
 
-
-
 def calculate_price_with_spread(price: float, spread_multiplier: float, increase: bool) -> float:
     if increase:
         return price * (1 + spread_multiplier)
@@ -59,8 +57,6 @@ def calculate_liquidation_price(entry_price: float, leverage: float, type: str) 
         raise ValueError(f"Unknown position type: {type}")
     
     return liq_p
-
-
 
 def calculate_trade_volume(open_price: float, current_price: float, current_pnl: float, leverage: float) -> float:
     """
